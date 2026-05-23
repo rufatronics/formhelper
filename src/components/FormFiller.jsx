@@ -12,6 +12,7 @@ import {
   SYSTEM_PROMPTS
 } from '../utils/prompts'
 import { validateField, normalizeAnswer } from '../utils/validators'
+import { parseFieldsFromResponse } from '../utils/extractFields'
 
 const FORM_TEMPLATES = [
   {
@@ -116,16 +117,19 @@ export function FormFiller({ onProviderChange }) {
     try {
       const prompt = buildFieldExtractionPrompt(text || 'Extract all form fields from this image.')
 
-      const result = await callJSON({
+      // Use call() not callJSON() — we do our own robust parsing
+      const { text: rawResponse } = await call({
         systemPrompt: SYSTEM_PROMPTS.formHelper,
         userPrompt: prompt.userPrompt,
         imageBase64: mode === 'image' ? base64 : null,
         mimeType:    mode === 'image' ? mimeType : null,
-        maxTokens: 1024
+        maxTokens: 1024,
+        temperature: 0.1
       })
 
+      const result = parseFieldsFromResponse(rawResponse)
       const extractedFields = result?.fields || []
-      if (extractedFields.length === 0) throw new Error('No form fields found. Try a clearer photo.')
+      if (extractedFields.length === 0) throw new Error('No fields found. Try a clearer photo or a different document.')
 
       setFields(extractedFields)
       setStage('filling')
@@ -137,7 +141,7 @@ export function FormFiller({ onProviderChange }) {
     } finally {
       setExtracting(false)
     }
-  }, [callJSON, askQuestion])
+  }, [call, askQuestion])
 
   const submitAnswer = useCallback(async (value) => {
     const v = String(value).trim()
@@ -368,5 +372,5 @@ export function FormFiller({ onProviderChange }) {
       </div>
     )
   }
-        }
+      }
        
