@@ -11,21 +11,43 @@ const MODELS = {
 
 function buildContents(prompt, history = [], imageBase64 = null, mimeType = null) {
   const contents = []
-
-  // Convert history to Gemma 4 format
   for (const msg of history) {
     contents.push({ role: msg.role, parts: [{ text: msg.content }] })
   }
-
-  // Build the current user message parts
   const parts = []
   if (imageBase64 && mimeType) {
     parts.push({ inline_data: { mime_type: mimeType, data: imageBase64 } })
   }
   parts.push({ text: prompt })
   contents.push({ role: 'user', parts })
-
   return contents
+}
+
+function cleanText(text) {
+  return text
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/\*\s+User says:[\s\S]*?\n\n/gi, '')
+    .replace(/\*\s+Context:[\s\S]*?\n/gi, '')
+    .replace(/\*\s+Persona:[\s\S]*?\n/gi, '')
+    .replace(/\*\s+Acknowledge[\s\S]*?\n/gi, '')
+    .replace(/\*\s+Introduce[\s\S]*?\n/gi, '')
+    .replace(/\*\s+Explain what[\s\S]*?\n/gi, '')
+    .replace(/\*\s+Invite[\s\S]*?\n/gi, '')
+    .trim()
+}
+
+function extractText(data) {
+  if (!data?.candidates?.[0]) throw new Error('No response from model')
+  const raw = data.candidates[0].content.parts
+    .filter(p => p.text && !p.thought)
+    .map(p => p.text)
+    .join('')
+  return cleanText(raw)
+}
+
+function parseJSON(text) {
+  const clean = text.replace(/```(?:json)?\s*/gi, '').replace(/```\s*$/g, '').trim()
+  try { return JSON.parse(clean) } catch { return null }
 }
 
 export function useGeminiAPI() {
@@ -34,7 +56,6 @@ export function useGeminiAPI() {
   const [streamText, setStreamText] = useState('')
   const abortRef = useRef(null)
 
-  // Standard (non-streaming) call
   const call = useCallback(async ({
     systemPrompt,
     userPrompt,
@@ -48,30 +69,26 @@ export function useGeminiAPI() {
   }) => {
     setLoading(true)
     setError(null)
-
     try {
       const payload = {
         model: heavy ? MODELS.heavy : MODELS.default,
         system_instruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined,
         contents: buildContents(userPrompt, history, imageBase64, mimeType),
         generationConfig: {
-          temperature: useThinking ? 1.0 : temperature,  // thinking requires temp=1
+          temperature: useThinking ? 1.0 : temperature,
           maxOutputTokens: maxTokens,
           ...(useThinking && { thinkingConfig: { thinkingBudget: 1024 } })
         }
       }
-
       const res = await fetch('/api/gemma', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
-
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}))
         throw new Error(errData.error || `API error ${res.status}`)
       }
-
       const data = await res.json()
       const text = extractText(data)
       return { text, raw: data }
@@ -83,7 +100,6 @@ export function useGeminiAPI() {
     }
   }, [])
 
-  // Streaming call — updates streamText in real time
   const stream = useCallback(async ({
     systemPrompt,
     userPrompt,
@@ -95,9 +111,7 @@ export function useGeminiAPI() {
     setLoading(true)
     setError(null)
     setStreamText('')
-
     abortRef.current = new AbortController()
-
     try {
       const payload = {
         model: MODELS.default,
@@ -106,14 +120,12 @@ export function useGeminiAPI() {
         contents: buildContents(userPrompt, history),
         generationConfig: { temperature, maxOutputTokens: maxTokens }
       }
-
       const res = await fetch('/api/gemma', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
         signal: abortRef.current.signal
       })
-
       if (!res.ok) throw new Error(`Stream error ${res.status}`)
 
       const reader = res.body.getReader()
@@ -123,28 +135,27 @@ export function useGeminiAPI() {
       while (true) {
         const { value, done } = await reader.read()
         if (done) break
-
         const chunk = decoder.decode(value, { stream: true })
         const lines = chunk.split('\n')
-
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue
           const jsonStr = line.slice(6).trim()
           if (jsonStr === '[DONE]') continue
-
           try {
             const parsed = JSON.parse(jsonStr)
-            const delta = parsed.candidates?.[0]?.content?.parts?.[0]?.text || ''
+            const part = parsed.candidates?.[0]?.content?.parts?.[0]
+            if (!part || part.thought) continue
+            const delta = part.text || ''
             if (delta) {
               fullText += delta
-              setStreamText(fullText)
-              onChunk?.(delta, fullText)
+              const cleaned = cleanText(fullText)
+              setStreamText(cleaned)
+              onChunk?.(delta, cleaned)
             }
           } catch { /* skip malformed chunks */ }
         }
       }
-
-      return fullText
+      return cleanText(fullText)
     } catch (err) {
       if (err.name !== 'AbortError') {
         setError(err.message)
@@ -160,7 +171,6 @@ export function useGeminiAPI() {
     abortRef.current?.abort()
   }, [])
 
-  // JSON-specific call — parses and validates JSON output
   const callJSON = useCallback(async (options) => {
     const { text } = await call({ ...options, temperature: 0.1 })
     const parsed = parseJSON(text)
@@ -169,20 +179,4 @@ export function useGeminiAPI() {
   }, [call])
 
   return { call, stream, callJSON, abort, loading, error, streamText }
-}
-
-// --- helpers ---
-
-function extractText(data) {
-  if (!data?.candidates?.[0]) throw new Error('No response from model')
-  return data.candidates[0].content.parts
-    .filter(p => p.text)
-    .map(p => p.text)
-    .join('')
-}
-
-function parseJSON(text) {
-  // Strip markdown code fences if present
-  const clean = text.replace(/```(?:json)?\s*/gi, '').replace(/```\s*$/g, '').trim()
-  try { return JSON.parse(clean) } catch { return null }
-}
+    }
