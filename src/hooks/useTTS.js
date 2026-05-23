@@ -1,15 +1,25 @@
-// useTTS.js — Text-to-speech via Web Speech SpeechSynthesis API
-import { useState, useCallback, useEffect, useRef } from 'react'
+// useTTS.js
+import { useState, useCallback, useEffect } from 'react'
+
+function cleanForSpeech(text) {
+  return text
+    .replace(/#{1,6}\s/g, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/`(.+?)`/g, '$1')
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+    .replace(/\n+/g, '. ')
+    .replace(/\.{2,}/g, '.')
+    .trim()
+}
 
 export function useTTS() {
   const [speaking, setSpeaking] = useState(false)
   const [supported] = useState(() => 'speechSynthesis' in window)
-  const [autoRead, setAutoRead] = useState(() => {
-    return localStorage.getItem('clearform_autoread') === 'true'
-  })
-  const utteranceRef = useRef(null)
+  const [autoRead, setAutoRead] = useState(
+    () => localStorage.getItem('clearform_autoread') === 'true'
+  )
 
-  // Pick a clear, natural voice
   const getVoice = useCallback(() => {
     const voices = window.speechSynthesis.getVoices()
     return (
@@ -24,26 +34,45 @@ export function useTTS() {
     if (!supported || !text) return
     window.speechSynthesis.cancel()
 
-    // Strip markdown for cleaner speech
-    const clean = text
-      .replace(/#{1,6}\s/g, '')
-      .replace(/\*\*(.+?)\*\*/g, '$1')
-      .replace(/\*(.+?)\*/g, '$1')
-      .replace(/`(.+?)`/g, '$1')
-      .replace(/\n+/g, '. ')
+    const clean = cleanForSpeech(text)
 
-    const utterance = new SpeechSynthesisUtterance(clean)
-    utterance.voice = getVoice()
-    utterance.rate = 0.9
-    utterance.pitch = 1.0
-    utterance.volume = 1.0
+    // Split into chunks of ~200 chars at sentence boundaries
+    // This prevents the browser from cutting off long responses
+    const sentences = clean.match(/[^.!?]+[.!?]+/g) || [clean]
+    const chunks = []
+    let current = ''
+    for (const sentence of sentences) {
+      if ((current + sentence).length > 200) {
+        if (current) chunks.push(current.trim())
+        current = sentence
+      } else {
+        current += sentence
+      }
+    }
+    if (current.trim()) chunks.push(current.trim())
 
-    utterance.onstart = () => setSpeaking(true)
-    utterance.onend = () => setSpeaking(false)
-    utterance.onerror = () => setSpeaking(false)
+    let chunkIndex = 0
 
-    utteranceRef.current = utterance
-    window.speechSynthesis.speak(utterance)
+    const speakNext = () => {
+      if (chunkIndex >= chunks.length) {
+        setSpeaking(false)
+        return
+      }
+      const utterance = new SpeechSynthesisUtterance(chunks[chunkIndex])
+      utterance.voice = getVoice()
+      utterance.rate = 0.92
+      utterance.pitch = 1.0
+      utterance.volume = 1.0
+      utterance.onend = () => {
+        chunkIndex++
+        speakNext()
+      }
+      utterance.onerror = () => setSpeaking(false)
+      window.speechSynthesis.speak(utterance)
+    }
+
+    setSpeaking(true)
+    speakNext()
   }, [supported, getVoice])
 
   const stop = useCallback(() => {
@@ -59,7 +88,7 @@ export function useTTS() {
     })
   }, [])
 
-  // Fix Chrome bug where speech stops after ~15s
+  // Fix Chrome bug — speech cuts out after ~15s
   useEffect(() => {
     if (!supported) return
     const id = setInterval(() => {
@@ -72,4 +101,4 @@ export function useTTS() {
   }, [supported])
 
   return { speak, stop, speaking, supported, autoRead, toggleAutoRead }
-}
+      }
