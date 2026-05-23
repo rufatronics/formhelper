@@ -1,41 +1,37 @@
 // prompts.js — All Gemma 4 prompt templates
-// Gemma 4 supports a native system role — we use it properly here.
 
 export const SYSTEM_PROMPTS = {
-  formHelper: `You are ClearForm, a helpful assistant that guides people with low literacy 
-through filling out official forms. Always use simple words a 10-year-old would understand. 
-Ask one question at a time. Be warm and encouraging. Never use jargon. 
-If someone makes an error, gently explain what's needed. Respond concisely.`,
+  formHelper: `You are ClearForm, a friendly form assistant. 
+Reply ONLY with your actual response — no bullet points explaining what you are about to do, no meta-commentary, no "User says", no "Persona", no thinking out loud.
+Use simple words. Be warm and brief. One question at a time.`,
 
-  tcCompare: `You are ClearForm, an assistant that explains legal documents in plain language. 
-Translate complex legal text into words a 3rd-grader would understand. 
-Focus on: what it costs, what you can and cannot do, how to cancel, and any penalties. 
-Be honest, neutral, and never give legal advice. Respond concisely.`,
+  tcCompare: `You are ClearForm, a plain-language document assistant.
+Reply ONLY with your actual response — no thinking out loud, no bullet planning, no meta-commentary.
+Use simple everyday words. Be clear and concise.`,
 
-  chat: `You are ClearForm, a friendly assistant helping people understand their forms and documents. 
-Use simple, clear language. Be patient and supportive. 
-If asked about legal, medical, or financial decisions, remind the user to consult a professional.`
+  chat: `You are ClearForm, a friendly assistant that helps people understand forms and documents.
+Reply ONLY with your actual answer — do not narrate your thought process, do not list what you are about to do, do not use bullet points to plan your response.
+Use simple, clear language. Be warm and direct. Keep responses short.`
 }
 
-// Form field extraction — uses Gemma 4 JSON mode
 export function buildFieldExtractionPrompt(documentText) {
   return {
     systemPrompt: SYSTEM_PROMPTS.formHelper,
-    userPrompt: `Look at this form and find all the blank fields that need to be filled in.
+    userPrompt: `Look at this form and find all blank fields that need to be filled in.
 
 Return ONLY valid JSON — no explanation, no markdown, no backticks.
 
-JSON format:
+Format:
 {
   "formTitle": "name of the form",
   "fields": [
     {
       "id": "unique_id",
-      "label": "exact label text from form",
+      "label": "exact label from form",
       "type": "text|email|phone|date|number|checkbox|radio|textarea|name|address",
-      "required": true or false,
-      "placeholder": "example of what to write",
-      "helpText": "one plain-English sentence explaining what this field is for"
+      "required": true,
+      "placeholder": "example value",
+      "helpText": "one plain-English sentence explaining this field"
     }
   ]
 }
@@ -45,71 +41,63 @@ ${documentText}`
   }
 }
 
-// Ask a single form question conversationally
 export function buildFormQuestionPrompt(field, previousAnswers) {
   const context = previousAnswers.length > 0
-    ? `So far they have answered:\n${previousAnswers.map(a => `- ${a.label}: ${a.value}`).join('\n')}\n\n`
+    ? `Already answered: ${previousAnswers.map(a => `${a.label}: ${a.value}`).join(', ')}.\n\n`
     : ''
 
   return {
     systemPrompt: SYSTEM_PROMPTS.formHelper,
-    userPrompt: `${context}Now ask the user to fill in this field in a warm, conversational way:
-
-Field: "${field.label}"
-Type: ${field.type}
-Required: ${field.required ? 'yes' : 'no'}
-Help: ${field.helpText || ''}
-
-Write a single short question (1-2 sentences). If it's a phone or email field, 
-give a clear example. Do not repeat the field label robotically.`
+    userPrompt: `${context}Ask the user for their "${field.label}" in one friendly sentence.
+${field.type === 'phone' ? 'Give an example like: (555) 123-4567' : ''}
+${field.type === 'email' ? 'Give an example like: name@email.com' : ''}
+${field.type === 'date' ? 'Give an example like: January 15, 1990' : ''}
+${!field.required ? 'Mention they can skip this.' : ''}
+Just write the question — nothing else.`
   }
 }
 
-// Validate a field answer
 export function buildValidationPrompt(field, userAnswer) {
   return {
     systemPrompt: SYSTEM_PROMPTS.formHelper,
-    userPrompt: `The user answered "${userAnswer}" for the field "${field.label}" (type: ${field.type}).
-
-Is this a valid answer? Return ONLY valid JSON:
+    userPrompt: `Is "${userAnswer}" a valid answer for a "${field.label}" field (type: ${field.type})?
+Return ONLY valid JSON:
 {
-  "valid": true or false,
-  "normalizedValue": "cleaned up version of their answer",
-  "errorMessage": "friendly explanation if invalid, empty string if valid"
+  "valid": true,
+  "normalizedValue": "cleaned up answer",
+  "errorMessage": ""
 }`
   }
 }
 
-// T&C simplification — uses thinking mode for better analysis
 export function buildSimplifyPrompt(legalText) {
   return {
     systemPrompt: SYSTEM_PROMPTS.tcCompare,
     userPrompt: `Rewrite this legal text so a 10-year-old can understand it.
-Use short sentences. Use everyday words. Keep ALL important facts (costs, deadlines, penalties, cancellation).
-Group into these sections: "What this is", "What it costs", "What you can do", "What you cannot do", "How to cancel", "Watch out for".
-Skip any section that doesn't apply.
+Short sentences. Everyday words. Keep all important facts (costs, deadlines, penalties, cancellation).
+Use these sections only where they apply: What this is / What it costs / What you can do / What you cannot do / How to cancel / Watch out for.
+Write the simplified version directly — no intro, no preamble.
 
 Legal text:
 ${legalText}`
   }
 }
 
-// T&C comparison — uses thinking mode, returns structured JSON
 export function buildComparePrompt(textA, textB, labelA = 'Document A', labelB = 'Document B') {
   return {
     systemPrompt: SYSTEM_PROMPTS.tcCompare,
     useThinking: true,
-    userPrompt: `Compare these two documents and find the key differences that affect a regular person.
+    userPrompt: `Compare these two documents. Find key differences that affect a regular person.
 
-Return ONLY valid JSON — no explanation, no markdown, no backticks:
+Return ONLY valid JSON — no explanation, no markdown:
 {
-  "summary": "2 sentence plain-English overall summary of the main difference",
-  "recommendation": "one clear sentence about which is more user-friendly and why, or 'They are equally good/bad'",
+  "summary": "2 sentence plain-English summary",
+  "recommendation": "one clear sentence about which is more user-friendly and why",
   "differences": [
     {
-      "topic": "plain English topic name (e.g. Cost, Cancellation, Privacy)",
-      "docA": "what Document A says in plain English",
-      "docB": "what Document B says in plain English",
+      "topic": "plain English topic (e.g. Cost, Cancellation, Privacy)",
+      "docA": "what ${labelA} says in plain English",
+      "docB": "what ${labelB} says in plain English",
       "userNote": "one sentence about what this means for the user"
     }
   ]
@@ -123,26 +111,23 @@ ${textB}`
   }
 }
 
-// Explain a specific clause
 export function buildExplainClausePrompt(clause, context = '') {
   return {
     systemPrompt: SYSTEM_PROMPTS.tcCompare,
-    userPrompt: `Explain this part of a document in very simple words:
+    userPrompt: `Explain this in very simple words that a 10-year-old would understand:
 
 "${clause}"
 
-${context ? `Context: ${context}\n` : ''}
-Write 2-3 short sentences. Use words a 10-year-old would know. 
-Focus on what this means for the person who signed it.`
+${context ? `Context: ${context}` : ''}
+
+Write 2-3 short sentences. Just the explanation — no intro, no "This means that".`
   }
 }
 
-// General chat
-export function buildChatPrompt(userMessage, history = [], documentContext = '') {
+export function buildChatPrompt(userMessage, history = []) {
   return {
     systemPrompt: SYSTEM_PROMPTS.chat,
     userPrompt: userMessage,
-    history,
-    documentContext
+    history
   }
-}
+    }
