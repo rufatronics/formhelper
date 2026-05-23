@@ -6,31 +6,27 @@ import { ChatWindow } from './components/ChatWindow'
 import { InstallPrompt } from './components/InstallPrompt'
 
 const TABS = [
-  { id: 'form', label: 'Fill Form', icon: '📝', shortLabel: 'Form' },
-  { id: 'compare', label: 'Compare Docs', icon: '⚖️', shortLabel: 'Compare' },
-  { id: 'chat', label: 'Ask Questions', icon: '💬', shortLabel: 'Chat' }
+  { id: 'form',    label: 'Fill Form',      icon: '📝', shortLabel: 'Form'    },
+  { id: 'compare', label: 'Compare Docs',   icon: '⚖️', shortLabel: 'Compare' },
+  { id: 'chat',    label: 'Ask Questions',  icon: '💬', shortLabel: 'Chat'    }
 ]
 
-function Header() {
+// Shows which provider is currently active — swaps when fallback kicks in
+function ProviderBadge({ provider }) {
+  const isOR = provider !== 'gemini'
   return (
-    <header className="px-4 pt-safe pt-4 pb-2 flex items-center gap-3">
-      <div className="w-8 h-8 bg-amber rounded-lg flex items-center justify-center flex-shrink-0">
-        <span className="text-ink text-sm font-display font-black">CF</span>
-      </div>
-      <div>
-        <h1 className="font-display font-black text-paper text-lg leading-tight">ClearForm</h1>
-        <p className="text-white/30 text-xs leading-tight">Powered by Gemma 4</p>
-      </div>
-      <div className="ml-auto flex items-center gap-1.5">
-        <span className="w-1.5 h-1.5 rounded-full bg-teal animate-pulse-slow" aria-hidden="true"/>
-        <span className="text-teal text-xs font-mono">gemma-4-26b</span>
-      </div>
-    </header>
+    <div className="ml-auto flex items-center gap-1.5">
+      <span className={`w-1.5 h-1.5 rounded-full animate-pulse-slow ${isOR ? 'bg-teal' : 'bg-amber'}`} aria-hidden="true"/>
+      <span className={`text-xs font-mono ${isOR ? 'text-teal' : 'text-amber'}`}>
+        {isOR ? 'openrouter' : 'gemini fallback'}
+      </span>
+    </div>
   )
 }
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('form')
+  const [provider, setProvider]   = useState('openrouter')
 
   return (
     <div className="min-h-dvh flex flex-col max-w-lg mx-auto relative">
@@ -41,26 +37,33 @@ export default function App() {
         <div className="absolute bottom-0 right-0 w-64 h-64 bg-amber/3 rounded-full blur-3xl"/>
       </div>
 
-      <Header />
+      {/* Header */}
+      <header className="px-4 pt-4 pb-2 flex items-center gap-3">
+        <div className="w-8 h-8 bg-amber rounded-lg flex items-center justify-center flex-shrink-0">
+          <span className="text-ink text-sm font-display font-black">CF</span>
+        </div>
+        <div>
+          <h1 className="font-display font-black text-paper text-lg leading-tight">ClearForm</h1>
+          <p className="text-white/30 text-xs leading-tight">Powered by Gemma 4</p>
+        </div>
+        <ProviderBadge provider={provider} />
+      </header>
 
       {/* Main content */}
       <main className="flex-1 px-4 py-4 overflow-y-auto pb-24" id="main-content" tabIndex="-1">
-        <div className={activeTab === 'form' ? 'block' : 'hidden'} role="tabpanel" id="panel-form" aria-labelledby="tab-form">
-          <FormFiller />
+        <div className={activeTab === 'form'    ? 'block' : 'hidden'} role="tabpanel" id="panel-form"    aria-labelledby="tab-form">
+          <FormFiller onProviderChange={setProvider} />
         </div>
         <div className={activeTab === 'compare' ? 'block' : 'hidden'} role="tabpanel" id="panel-compare" aria-labelledby="tab-compare">
-          <TCCompare />
+          <TCCompare onProviderChange={setProvider} />
         </div>
-        <div className={activeTab === 'chat' ? 'block' : 'hidden'} role="tabpanel" id="panel-chat" aria-labelledby="tab-chat">
-          <ChatWindow />
+        <div className={activeTab === 'chat'    ? 'block' : 'hidden'} role="tabpanel" id="panel-chat"    aria-labelledby="tab-chat">
+          <ChatWindow onProviderChange={setProvider} />
         </div>
       </main>
 
       {/* Bottom nav */}
-      <nav
-        className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-ink/95 backdrop-blur-xl border-t border-white/10 pb-safe px-2 pt-2"
-        aria-label="Main navigation"
-      >
+      <nav className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-ink/95 backdrop-blur-xl border-t border-white/10 pb-safe px-2 pt-2" aria-label="Main navigation">
         <div className="flex">
           {TABS.map(tab => (
             <button
@@ -73,9 +76,7 @@ export default function App() {
               className={`
                 flex-1 flex flex-col items-center gap-1 py-2 px-1 rounded-xl transition-all duration-200
                 focus-visible:ring-2 focus-visible:ring-amber/50 focus-visible:outline-none
-                ${activeTab === tab.id
-                  ? 'text-amber bg-amber/10'
-                  : 'text-white/30 hover:text-white/60 hover:bg-white/5'}
+                ${activeTab === tab.id ? 'text-amber bg-amber/10' : 'text-white/30 hover:text-white/60 hover:bg-white/5'}
               `}
             >
               <span className="text-xl" aria-hidden="true">{tab.icon}</span>
@@ -88,4 +89,5 @@ export default function App() {
       <InstallPrompt />
     </div>
   )
-}
+      }
+        
