@@ -3,12 +3,16 @@ import { useState } from 'react'
 import { FormFiller } from './components/FormFiller'
 import { TCCompare } from './components/TCCompare'
 import { ChatWindow } from './components/ChatWindow'
+import { VerifyView } from './components/VerifyView'
+import { ScamCheckView } from './components/ScamCheckView'
 import { InstallPrompt } from './components/InstallPrompt'
 
 const TABS = [
   { id: 'form',    label: 'Fill Form',      icon: '📝', shortLabel: 'Form'    },
   { id: 'compare', label: 'Compare Docs',   icon: '⚖️', shortLabel: 'Compare' },
-  { id: 'chat',    label: 'Ask Questions',  icon: '💬', shortLabel: 'Chat'    }
+  { id: 'chat',    label: 'Ask Questions',  icon: '💬', shortLabel: 'Chat'    },
+  { id: 'verify',  label: 'Verify Doc',     icon: '🛡️', shortLabel: 'Verify'  },
+  { id: 'scam',    label: 'Scam Check',     icon: '🎯', shortLabel: 'Scam'    }
 ]
 
 // Shows which provider is currently active — swaps when fallback kicks in
@@ -59,6 +63,12 @@ export default function App() {
         </div>
         <div className={activeTab === 'chat'    ? 'block' : 'hidden'} role="tabpanel" id="panel-chat"    aria-labelledby="tab-chat">
           <ChatWindow onProviderChange={setProvider} />
+        </div>
+        <div className={activeTab === 'verify'  ? 'block' : 'hidden'} role="tabpanel" id="panel-verify"  aria-labelledby="tab-verify">
+          <VerifyView />
+        </div>
+        <div className={activeTab === 'scam'    ? 'block' : 'hidden'} role="tabpanel" id="panel-scam"    aria-labelledby="tab-scam">
+          <ScamCheckView />
         </div>
       </main>
 
