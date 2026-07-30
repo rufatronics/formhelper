@@ -7,13 +7,7 @@ import { VerifyView } from './components/VerifyView'
 import { ScamCheckView } from './components/ScamCheckView'
 import { InstallPrompt } from './components/InstallPrompt'
 
-const TABS = [
-  { id: 'form',    label: 'Fill Form',      icon: '📝', shortLabel: 'Form'    },
-  { id: 'compare', label: 'Compare Docs',   icon: '⚖️', shortLabel: 'Compare' },
-  { id: 'chat',    label: 'Ask Questions',  icon: '💬', shortLabel: 'Chat'    },
-  { id: 'verify',  label: 'Verify Doc',     icon: '🛡️', shortLabel: 'Verify'  },
-  { id: 'scam',    label: 'Scam Check',     icon: '🎯', shortLabel: 'Scam'    }
-]
+import { LANGUAGES, TRANSLATIONS } from './utils/translations'
 
 // Shows which provider is currently active — swaps when fallback kicks in
 function ProviderBadge({ provider }) {
@@ -31,6 +25,17 @@ function ProviderBadge({ provider }) {
 export default function App() {
   const [activeTab, setActiveTab] = useState('form')
   const [provider, setProvider]   = useState('openrouter')
+  const [lang, setLang]           = useState('en')
+
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+
+  const dynamicTabs = [
+    { id: 'form',    label: t.form,    icon: '📝', shortLabel: t.form.split(' ')[0] },
+    { id: 'compare', label: t.compare, icon: '⚖️', shortLabel: t.compare.split(' ')[0] },
+    { id: 'chat',    label: t.chat,    icon: '💬', shortLabel: t.chat.split(' ')[0] },
+    { id: 'verify',  label: t.verify,  icon: '🛡️', shortLabel: t.verify.split(' ')[0] },
+    { id: 'scam',    label: t.scam,    icon: '🎯', shortLabel: t.scam.split(' ')[0] }
+  ];
 
   return (
     <div className="min-h-dvh flex flex-col max-w-lg mx-auto relative">
@@ -48,9 +53,25 @@ export default function App() {
         </div>
         <div>
           <h1 className="font-display font-black text-paper text-lg leading-tight">ClearForm</h1>
-          <p className="text-white/30 text-xs leading-tight">Powered by Gemma 4</p>
+          <p className="text-white/30 text-xs leading-tight">{t.subTitle}</p>
         </div>
         <ProviderBadge provider={provider} />
+
+        {/* Language Selector */}
+        <div className="flex items-center gap-1.5 ml-2">
+          <select
+            value={lang}
+            onChange={(e) => setLang(e.target.value)}
+            className="bg-white/10 border border-white/20 text-paper text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-amber/50 font-medium"
+            aria-label="Select Language"
+          >
+            {LANGUAGES.map((l) => (
+              <option key={l.id} value={l.id} className="bg-ink text-paper">
+                {l.flag} {l.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </header>
 
       {/* Main content */}
@@ -65,17 +86,17 @@ export default function App() {
           <ChatWindow onProviderChange={setProvider} />
         </div>
         <div className={activeTab === 'verify'  ? 'block' : 'hidden'} role="tabpanel" id="panel-verify"  aria-labelledby="tab-verify">
-          <VerifyView />
+          <VerifyView lang={lang} />
         </div>
         <div className={activeTab === 'scam'    ? 'block' : 'hidden'} role="tabpanel" id="panel-scam"    aria-labelledby="tab-scam">
-          <ScamCheckView />
+          <ScamCheckView lang={lang} />
         </div>
       </main>
 
       {/* Bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-ink/95 backdrop-blur-xl border-t border-white/10 pb-safe px-2 pt-2" aria-label="Main navigation">
         <div className="flex">
-          {TABS.map(tab => (
+          {dynamicTabs.map(tab => (
             <button
               key={tab.id}
               id={`tab-${tab.id}`}

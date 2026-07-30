@@ -133,7 +133,15 @@ export function buildChatPrompt(userMessage, history = []) {
     }
 
 // --- Verify Mode Prompts ---
-export function buildVerifyPrompt(forensicsData) {
+export function buildVerifyPrompt(forensicsData, lang = 'en') {
+  const langInstructions = {
+    en: "Write all report fields, section titles, findings, implications, and recommendations in standard English.",
+    ha: "Write all report fields, findings, implications, and recommendations in Hausa. Translate technical terms to plain Hausa so low-literacy northern Nigerian users understand easily.",
+    pcm: "Write all report fields, findings, implications, and recommendations in Nigerian Pidgin English (e.g., 'trust score', 'wetin we find', 'wetin e mean'). Keep the phrasing extremely accessible."
+  };
+
+  const instruction = langInstructions[lang] || langInstructions.en;
+
   return {
     systemPrompt: `You are ClearForm, a document verification expert powered by Gemma 4.
 Analyze the provided JSON forensic signals to evaluate if a document is genuine, edited, AI-generated, a repeatedly saved copy, or fabricated.
@@ -142,13 +150,14 @@ CRITICAL RULES:
 1. Always be calibrated, precise, and non-alarmist. Flag only what the evidence actually supports.
 2. Return ONLY a single valid JSON object. No explanation outside the JSON. No markdown other than the JSON itself.
 3. The recommendation must never be a legal or absolute claim. E.g. "verify with issuing institution" or "examine the physical stamp".
+4. ${instruction}
 
 JSON response format:
 {
   "confidenceScore": 85,
   "classification": "genuine | edited-genuine | AI-generated | re-shared-copy | fabricated-from-scratch",
   "summary": "Plain-language summary of reasoning in one or two simple sentences that a non-technical user can understand.",
-  "recommendation": "A friendly, calibrated recommendation (e.g. 'We recommend verifying with the issuing school' or 'Examine the paper version for physical stamps').",
+  "recommendation": "A friendly, calibrated recommendation.",
   "sections": [
     {
       "title": "Error Level Analysis (ELA)",
@@ -190,7 +199,15 @@ ${JSON.stringify(forensicsData, null, 2)}`
 }
 
 // --- Scam Check Mode Prompts ---
-export function buildScamCheckPrompt(scamPayload) {
+export function buildScamCheckPrompt(scamPayload, lang = 'en') {
+  const langInstructions = {
+    en: "Write all response fields, red flags, link check reasons, and recommendations in standard English.",
+    ha: "Write all response fields, red flags, link check reasons, and recommendations in clear plain Hausa so users understand immediately.",
+    pcm: "Write all response fields, red flags, link check reasons, and recommendations in Nigerian Pidgin English (e.g., 'No send money!', 'Fake bank domain')."
+  };
+
+  const instruction = langInstructions[lang] || langInstructions.en;
+
   return {
     systemPrompt: `You are ClearForm, a friendly assistant specialized in checking messages for potential scams, powered by Gemma 4.
 Analyze the provided text and URL features to evaluate risk levels.
@@ -199,6 +216,7 @@ CRITICAL RULES:
 1. Do not flag normal or legitimate links as suspicious by default. Only flag real red flags (such as lookalike domains, suspicious TLDs, known url shortener hiding destination, or mismatched display text vs actual href).
 2. All analysis must be structured, helpful, and non-alarmist.
 3. Return ONLY a single valid JSON object. No explanation outside the JSON. No markdown other than the JSON itself.
+4. ${instruction}
 
 JSON response format:
 {
@@ -208,7 +226,7 @@ JSON response format:
   "recommendation": "A helpful recommendation (e.g., 'don't send money or personal info until you verify directly with the company').",
   "redFlags": [
     {
-      "flag": "urgency language, upfront fee request, impersonation, etc.",
+      "flag": "indicator name",
       "explanation": "Why this matters in a simple one-line sentence."
     }
   ],

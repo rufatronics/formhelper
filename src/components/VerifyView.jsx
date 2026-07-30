@@ -1,3 +1,4 @@
+import { TRANSLATIONS } from '../utils/translations'
 // src/components/VerifyView.jsx
 import { useState, useCallback, useRef } from 'react'
 import { useGeminiAPI } from '../hooks/useGeminiAPI'
@@ -12,7 +13,9 @@ import {
   parseJPEGQuantization
 } from '../utils/forensics'
 
-export function VerifyView() {
+export function VerifyView({ lang = 'en' }) {
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+
   const [doc, setDoc] = useState(null)
   const [forensicSignals, setForensicSignals] = useState(null)
   const [report, setReport] = useState(null)
@@ -39,7 +42,7 @@ export function VerifyView() {
   const runAnalysis = useCallback(async () => {
     if (!doc) return
     setStage('processing')
-    setLoadingMsg('Reading image layout…')
+    setLoadingMsg(t.verifyProcessingDesc)
 
     try {
       // 1. Load Image Element for client-side pixel extraction
@@ -52,19 +55,19 @@ export function VerifyView() {
       })
 
       // 2. Perform Classical Client-Side Image Forensics
-      setLoadingMsg('Performing Error Level Analysis (ELA)…')
+      setLoadingMsg(t.verifyProcessingDesc)
       const elaResult = await performELA(img, 0.85)
 
-      setLoadingMsg('Analyzing frequency domain (FFT)…')
+      setLoadingMsg(t.verifyProcessingDesc)
       const fftResult = await performFFTCheck(img)
 
-      setLoadingMsg('Calculating local noise consistency map…')
+      setLoadingMsg(t.verifyProcessingDesc)
       const noiseResult = await performNoiseConsistency(img)
 
-      setLoadingMsg('Scanning text line alignments (OpenCV)…')
+      setLoadingMsg(t.verifyProcessingDesc)
       const opencvResult = await performOpenCVForensics(img)
 
-      setLoadingMsg('Parsing re-compression quantization signatures…')
+      setLoadingMsg(t.verifyProcessingDesc)
       const dqtResult = await parseJPEGQuantization(doc.file)
 
       const signals = {
@@ -86,8 +89,8 @@ export function VerifyView() {
       setForensicSignals(signals)
 
       // 3. Send raw signals to Gemma 4 to formulate verdict and report
-      setLoadingMsg('Formulating calibrated verification report with Gemma 4…')
-      const prompt = buildVerifyPrompt(signals)
+      setLoadingMsg(t.verifyProcessingDesc)
+      const prompt = buildVerifyPrompt(signals, lang)
       const reportResponse = await callJSON({
         systemPrompt: prompt.systemPrompt,
         userPrompt: prompt.userPrompt,
@@ -120,12 +123,12 @@ export function VerifyView() {
     return (
       <div className="space-y-6 animate-fade-up">
         <div>
-          <h2 className="font-display text-2xl font-bold text-paper mb-1">Verify Document</h2>
-          <p className="text-white/50 text-sm">Upload a certificate, admission letter, or ID to analyze if it is genuine, digitally modified, or AI-generated.</p>
+          <h2 className="font-display text-2xl font-bold text-paper mb-1">{t.verifyTitle}</h2>
+          <p className="text-white/50 text-sm">{t.verifyDesc}</p>
         </div>
 
         <DocumentUploader
-          label="Select or take a photo of the document"
+          label={t.verifyUploader}
           accept="image/*"
           onExtracted={handleDocumentSelected}
         />
@@ -141,7 +144,7 @@ export function VerifyView() {
             </div>
 
             <button onClick={runAnalysis} className="btn-primary w-full text-lg py-4">
-              Analyze Forensics with Gemma 4 →
+              {t.verifyAnalysisBtn}
             </button>
           </div>
         )}
@@ -159,8 +162,8 @@ export function VerifyView() {
           <span className="absolute inset-0 flex items-center justify-center text-2xl" aria-hidden="true">🛡️</span>
         </div>
         <div>
-          <h2 className="font-display text-xl font-bold">Document Forensics</h2>
-          <p className="text-white/40 text-sm mt-1">{loadingMsg}</p>
+          <h2 className="font-display text-xl font-bold">{t.verifyProcessingTitle}</h2>
+          <p className="text-white/40 text-sm mt-1">{loadingMsg || t.verifyProcessingDesc}</p>
         </div>
       </div>
     )
@@ -178,8 +181,8 @@ export function VerifyView() {
   return (
     <div className="space-y-6 animate-fade-up">
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-xl font-bold">Verification Report</h2>
-        <button onClick={reset} className="text-white/30 text-xs hover:text-white/60">← Start New</button>
+        <h2 className="font-display text-xl font-bold">{t.verifyResultsTitle}</h2>
+        <button onClick={reset} className="text-white/30 text-xs hover:text-white/60">{t.verifyStartNew}</button>
       </div>
 
       {report && (
@@ -187,7 +190,7 @@ export function VerifyView() {
           {/* Main prominence card */}
           <div className={`card p-5 border-2 ${classificationColors[report.classification] || 'border-amber/20 bg-amber/5'} space-y-3`}>
             <div className="flex items-center justify-between">
-              <span className="text-white/40 text-xs uppercase tracking-widest">Classification</span>
+              <span className="text-white/40 text-xs uppercase tracking-widest">{t.verifyClassification}</span>
               <span className="text-xs px-2.5 py-1 rounded-full bg-white/10 font-semibold font-mono">
                 Score: {report.confidenceScore}%
               </span>
@@ -206,7 +209,7 @@ export function VerifyView() {
           {/* ELA Heatmap Viewer */}
           {forensicSignals?.ela?.heatmapDataUrl && (
             <div className="card p-4 space-y-2">
-              <p className="font-display font-bold text-sm text-paper/80">Error Level Analysis Heatmap</p>
+              <p className="font-display font-bold text-sm text-paper/80">{t.verifyHeatmapTitle}</p>
               <div className="relative aspect-[3/4] max-h-72 rounded-xl overflow-hidden border border-white/10 bg-black">
                 <img
                   src={forensicSignals.ela.heatmapDataUrl}
@@ -215,14 +218,14 @@ export function VerifyView() {
                 />
               </div>
               <p className="text-white/40 text-[11px] leading-snug">
-                Heatmap shows local compression differences. High-contrast edge highlights are normal, but localized bright grids/spots often point to digital modifications.
+                {t.verifyHeatmapDesc}
               </p>
             </div>
           )}
 
           {/* Detailed Forensic Section Accordions */}
           <div className="space-y-3">
-            <h3 className="font-display font-semibold text-paper/80">Detailed Signals Analysis</h3>
+            <h3 className="font-display font-semibold text-paper/80">{t.verifySignalsTitle}</h3>
             {report.sections?.map((section, idx) => {
               const isExpanded = !!expandedSections[idx];
               return (
