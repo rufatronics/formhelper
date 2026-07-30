@@ -6,9 +6,9 @@ export async function extractTextFromFile(file) {
   const type = file.type
 
   if (type.startsWith('image/')) {
-    // Return base64 for direct Gemma 4 vision input
-    const base64 = await fileToBase64(file)
-    return { mode: 'image', base64, mimeType: type, text: null }
+    // Resize & compress image to avoid huge base64 payload fetch errors
+    const compressedResult = await resizeAndCompressImage(file)
+    return { mode: 'image', base64: compressedResult.base64, mimeType: compressedResult.mimeType, text: null }
   }
 
   if (type === 'application/pdf') {
@@ -93,4 +93,52 @@ export function formatFileSize(bytes) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export async function resizeAndCompressImage(file, maxWidth = 1024, maxHeight = 1024, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.onload = () => {
+      let width = img.naturalWidth || img.width;
+      let height = img.naturalHeight || img.height;
+
+      // Calculate new dimensions keeping aspect ratio
+      if (width > maxWidth || height > maxHeight) {
+        if (width > height) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        } else {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Canvas compression failed'));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = reader.result.split(',')[1];
+          resolve({ base64, mimeType: 'image/jpeg' });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      }, 'image/jpeg', quality);
+
+      URL.revokeObjectURL(img.src);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      reject(new Error('Failed to load image for resizing'));
+    };
+  });
 }
