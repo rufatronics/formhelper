@@ -1,4 +1,10 @@
-// App.jsx
+// src/App.jsx
+// Main entry point for Kariya: A specialized application designed to empower
+// low-literacy or non-literate individuals in Nigeria to fill forms, analyze
+// documents for AI synthesis, and identify SMS/job scams.
+// Default language is Hausa to prioritize reach in Northern Nigerian communities,
+// and it supports dynamic language toggle to English and Nigerian Pidgin.
+
 import { useState } from 'react'
 import { FormFiller } from './components/FormFiller'
 import { TCCompare } from './components/TCCompare'
@@ -9,7 +15,10 @@ import { InstallPrompt } from './components/InstallPrompt'
 
 import { LANGUAGES, TRANSLATIONS } from './utils/translations'
 
-// Shows which provider is currently active — swaps when fallback kicks in
+/**
+ * Status badge showing which LLM provider is currently active.
+ * Swaps to Gemini Fallback if OpenRouter times out or has a fetch failure.
+ */
 function ProviderBadge({ provider }) {
   const isOR = provider !== 'gemini'
   return (
@@ -23,12 +32,16 @@ function ProviderBadge({ provider }) {
 }
 
 export default function App() {
+  // Navigation active tab (defaults to 'form' i.e. "Cika Takarda")
   const [activeTab, setActiveTab] = useState('form')
+  // Track LLM fallback status
   const [provider, setProvider]   = useState('openrouter')
-  const [lang, setLang]           = useState('en')
+  // DEFAULT LANGUAGE: Hausa ('ha')
+  const [lang, setLang]           = useState('ha')
 
-  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.ha;
 
+  // Render bottom navigation tabs with localized strings and visual emojis
   const dynamicTabs = [
     { id: 'form',    label: t.form,    icon: '📝', shortLabel: t.form.split(' ')[0] },
     { id: 'compare', label: t.compare, icon: '⚖️', shortLabel: t.compare.split(' ')[0] },
@@ -38,26 +51,26 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-dvh flex flex-col max-w-lg mx-auto relative">
-      {/* Ambient background */}
+    <div className="min-h-dvh flex flex-col max-w-lg mx-auto relative bg-ink">
+      {/* Ambient background blur for professional mobile layout */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
         <div className="absolute -top-32 -right-32 w-96 h-96 bg-amber/5 rounded-full blur-3xl"/>
         <div className="absolute top-1/2 -left-32 w-80 h-80 bg-teal/5 rounded-full blur-3xl"/>
         <div className="absolute bottom-0 right-0 w-64 h-64 bg-amber/3 rounded-full blur-3xl"/>
       </div>
 
-      {/* Header */}
-      <header className="px-4 pt-4 pb-2 flex items-center gap-3">
+      {/* Header section with brand logo (KY for Kariya) and language selector */}
+      <header className="px-4 pt-4 pb-2 flex items-center gap-3 border-b border-white/5 bg-ink/50 backdrop-blur">
         <div className="w-8 h-8 bg-amber rounded-lg flex items-center justify-center flex-shrink-0">
-          <span className="text-ink text-sm font-display font-black">CF</span>
+          <span className="text-ink text-sm font-display font-black">KY</span>
         </div>
         <div>
-          <h1 className="font-display font-black text-paper text-lg leading-tight">ClearForm</h1>
+          <h1 className="font-display font-black text-paper text-lg leading-tight">Kariya</h1>
           <p className="text-white/30 text-xs leading-tight">{t.subTitle}</p>
         </div>
         <ProviderBadge provider={provider} />
 
-        {/* Language Selector */}
+        {/* Multilingual Selector dropdown */}
         <div className="flex items-center gap-1.5 ml-2">
           <select
             value={lang}
@@ -74,16 +87,16 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main content */}
+      {/* Main content body (rendered as tabs to avoid reset of state when navigating) */}
       <main className="flex-1 px-4 py-4 overflow-y-auto pb-24" id="main-content" tabIndex="-1">
         <div className={activeTab === 'form'    ? 'block' : 'hidden'} role="tabpanel" id="panel-form"    aria-labelledby="tab-form">
-          <FormFiller onProviderChange={setProvider} />
+          <FormFiller onProviderChange={setProvider} lang={lang} />
         </div>
         <div className={activeTab === 'compare' ? 'block' : 'hidden'} role="tabpanel" id="panel-compare" aria-labelledby="tab-compare">
-          <TCCompare onProviderChange={setProvider} />
+          <TCCompare lang={lang} />
         </div>
         <div className={activeTab === 'chat'    ? 'block' : 'hidden'} role="tabpanel" id="panel-chat"    aria-labelledby="tab-chat">
-          <ChatWindow onProviderChange={setProvider} />
+          <ChatWindow lang={lang} />
         </div>
         <div className={activeTab === 'verify'  ? 'block' : 'hidden'} role="tabpanel" id="panel-verify"  aria-labelledby="tab-verify">
           <VerifyView lang={lang} />
@@ -93,8 +106,8 @@ export default function App() {
         </div>
       </main>
 
-      {/* Bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-ink/95 backdrop-blur-xl border-t border-white/10 pb-safe px-2 pt-2" aria-label="Main navigation">
+      {/* Persistent Bottom Tab Navigation for intuitive mobile feel */}
+      <nav className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-ink/95 backdrop-blur-xl border-t border-white/10 pb-safe px-2 pt-2 z-50" aria-label="Main navigation">
         <div className="flex">
           {dynamicTabs.map(tab => (
             <button
@@ -107,11 +120,11 @@ export default function App() {
               className={`
                 flex-1 flex flex-col items-center gap-1 py-2 px-1 rounded-xl transition-all duration-200
                 focus-visible:ring-2 focus-visible:ring-amber/50 focus-visible:outline-none
-                ${activeTab === tab.id ? 'text-amber bg-amber/10' : 'text-white/30 hover:text-white/60 hover:bg-white/5'}
+                ${activeTab === tab.id ? 'text-amber bg-amber/10 font-bold' : 'text-white/30 hover:text-white/60 hover:bg-white/5'}
               `}
             >
               <span className="text-xl" aria-hidden="true">{tab.icon}</span>
-              <span className="text-xs font-body font-medium">{tab.shortLabel}</span>
+              <span className="text-[10px] font-body font-medium truncate max-w-[70px]">{tab.shortLabel}</span>
             </button>
           ))}
         </div>
@@ -120,5 +133,4 @@ export default function App() {
       <InstallPrompt />
     </div>
   )
-      }
-        
+}

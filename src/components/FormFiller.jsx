@@ -1,4 +1,7 @@
 // FormFiller.jsx
+// React Component supporting low-literacy users in Nigeria to fill official documents.
+// Features step-by-step audio/visual questions, localized templates, and vision-based parsing.
+
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useGeminiAPI } from '../hooks/useGeminiAPI'
 import { useTTS } from '../hooks/useTTS'
@@ -13,47 +16,66 @@ import {
 } from '../utils/prompts'
 import { validateField, normalizeAnswer } from '../utils/validators'
 import { parseFieldsFromResponse } from '../utils/extractFields'
+import { TRANSLATIONS } from '../utils/translations'
 
-const FORM_TEMPLATES = [
-  {
-    id: 'rental', label: 'Rental Application', icon: '🏠',
-    fields: [
-      { id: 'full_name',      label: 'Full Name',                  type: 'name',    required: true,  helpText: 'Your legal first and last name' },
-      { id: 'dob',            label: 'Date of Birth',              type: 'date',    required: true,  helpText: 'Your birthday' },
-      { id: 'phone',          label: 'Phone Number',               type: 'phone',   required: true,  helpText: 'A number people can call you on' },
-      { id: 'email',          label: 'Email Address',              type: 'email',   required: false, helpText: 'Your email if you have one' },
-      { id: 'current_address',label: 'Current Address',            type: 'address', required: true,  helpText: 'Where you live right now' },
-      { id: 'employer',       label: 'Employer / Income Source',   type: 'text',    required: true,  helpText: 'Where you work or how you earn money' },
-      { id: 'monthly_income', label: 'Monthly Income',             type: 'number',  required: true,  helpText: 'How much money you earn each month' }
-    ]
-  },
-  {
-    id: 'medical', label: 'Medical Intake', icon: '🏥',
-    fields: [
-      { id: 'full_name',        label: 'Patient Full Name',          type: 'name',  required: true,  helpText: 'Your legal name' },
-      { id: 'dob',              label: 'Date of Birth',              type: 'date',  required: true,  helpText: 'Your birthday' },
-      { id: 'insurance',        label: 'Insurance Provider',         type: 'text',  required: false, helpText: 'Your health insurance company name' },
-      { id: 'insurance_id',     label: 'Insurance ID Number',        type: 'text',  required: false, helpText: 'The number on your insurance card' },
-      { id: 'emergency_contact',label: 'Emergency Contact Name',     type: 'name',  required: true,  helpText: 'Someone we can call in an emergency' },
-      { id: 'emergency_phone',  label: 'Emergency Contact Phone',    type: 'phone', required: true,  helpText: 'Their phone number' },
-      { id: 'allergies',        label: 'Known Allergies',            type: 'textarea', required: false, helpText: 'Any medicines or foods you are allergic to' }
-    ]
-  },
-  {
-    id: 'benefits', label: 'Benefits Application', icon: '📋',
-    fields: [
-      { id: 'full_name',      label: 'Full Name',                        type: 'name',   required: true,  helpText: 'Your legal name' },
-      { id: 'ssn_last4',     label: 'Last 4 of Social Security Number',  type: 'text',   required: true,  helpText: 'Just the last 4 digits of your SSN' },
-      { id: 'dob',            label: 'Date of Birth',                    type: 'date',   required: true,  helpText: 'Your birthday' },
-      { id: 'address',        label: 'Home Address',                     type: 'address',required: true,  helpText: 'Where you currently live' },
-      { id: 'household_size', label: 'Number of People in Household',    type: 'number', required: true,  helpText: 'How many people live with you' },
-      { id: 'monthly_income', label: 'Total Household Monthly Income',   type: 'number', required: true,  helpText: 'Total money earned by everyone in your home per month' }
-    ]
-  },
-  { id: 'custom', label: 'Upload My Own Form', icon: '📤', fields: null }
-]
+/**
+ * Returns localized templates configured specifically for Nigerian document contexts (NIN, School Admission, Tenancy).
+ * Dynamically binds names, labels, and helper prompts to the user's active selected language.
+ *
+ * @param {string} lang - Active language ID ('ha', 'en', 'pcm')
+ * @returns {Array<Object>} Localized templates list
+ */
+function getLocalizedTemplates(lang) {
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.ha; // Defaults to Hausa
+  return [
+    {
+      id: 'nin',
+      label: t.tmplNID,
+      icon: '🇳🇬',
+      fields: [
+        { id: 'full_name',      label: t.fieldNINName,       type: 'name',    required: true,  helpText: t.fieldNINNameHelp },
+        { id: 'dob',            label: t.fieldNINDob,        type: 'date',    required: true,  helpText: t.fieldNINDobHelp },
+        { id: 'phone',          label: t.fieldNINPhone,      type: 'phone',   required: true,  helpText: t.fieldNINPhoneHelp },
+        { id: 'state_origin',   label: t.fieldNINState,      type: 'text',    required: true,  helpText: t.fieldNINStateHelp }
+      ]
+    },
+    {
+      id: 'admission',
+      label: t.tmplAdmission,
+      icon: '🏫',
+      fields: [
+        { id: 'student_name',   label: t.fieldAdmName,       type: 'name',    required: true,  helpText: t.fieldAdmNameHelp },
+        { id: 'reg_num',        label: t.fieldAdmReg,        type: 'text',    required: true,  helpText: t.fieldAdmRegHelp },
+        { id: 'course',         label: t.fieldAdmCourse,     type: 'text',    required: true,  helpText: t.fieldAdmCourseHelp }
+      ]
+    },
+    {
+      id: 'tenancy',
+      label: t.tmplTenancy,
+      icon: '📜',
+      fields: [
+        { id: 'tenant_name',    label: t.fieldTenTenant,     type: 'name',    required: true,  helpText: t.fieldTenTenantHelp },
+        { id: 'rent_amount',    label: t.fieldTenRent,       type: 'number',  required: true,  helpText: t.fieldTenRentHelp },
+        { id: 'witness_name',   label: t.fieldTenWitness,    type: 'text',    required: false, helpText: t.fieldTenWitnessHelp }
+      ]
+    },
+    {
+      id: 'custom',
+      label: t.tmplCustom,
+      icon: '📤',
+      fields: null
+    }
+  ]
+}
 
-export function FormFiller({ onProviderChange }) {
+/**
+ * Main form filler engine guiding low-literacy users through complex forms using standard/local templates.
+ * Relies on voice inputs, offline caches, and step-by-step progress bars to minimize cognitive load.
+ */
+export function FormFiller({ onProviderChange, lang = 'ha' }) {
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.ha; // Access translations localized dictionary
+  const FORM_TEMPLATES = getLocalizedTemplates(lang);
+
   const [stage, setStage]           = useState('select')
   const [template, setTemplate]     = useState(null)
   const [fields, setFields]         = useState([])
@@ -72,10 +94,10 @@ export function FormFiller({ onProviderChange }) {
 
   const currentField   = fields[currentIndex]
 
-  // Bubble provider changes up to App for the header badge
+  // Sync state changes in API provider to App components
   useEffect(() => { onProviderChange?.(provider) }, [provider, onProviderChange])
 
-  // Ask the current question via AI
+  // Fetches localized questions step-by-step from Gemma 4 model or defaults back to clear localized placeholders
   const askQuestion = useCallback(async (index, fs, ans) => {
     const field = fs[index]
     if (!field) return
@@ -89,16 +111,17 @@ export function FormFiller({ onProviderChange }) {
     try {
       const { text } = await call({
         systemPrompt: SYSTEM_PROMPTS.formHelper,
-        userPrompt: prompt.userPrompt
+        userPrompt: `${prompt.userPrompt}\nTranslate this final question to: ${lang === 'ha' ? 'Hausa' : lang === 'pcm' ? 'Nigerian Pidgin' : 'English'}`
       })
       setQuestion(text)
       if (autoRead) speak(text)
     } catch {
-      const fallback = `Please enter your ${field.label}.`
+      // Fallback text if API is unresponsive
+      const fallback = `${lang === 'ha' ? 'Don Allah shigar da' : lang === 'pcm' ? 'Enter your' : 'Please enter your'} ${field.label}.`
       setQuestion(fallback)
       if (autoRead) speak(fallback)
     }
-  }, [call, speak, autoRead])
+  }, [call, speak, autoRead, lang])
 
   const startTemplate = useCallback(async (tmpl) => {
     setTemplate(tmpl)
@@ -111,13 +134,12 @@ export function FormFiller({ onProviderChange }) {
     }
   }, [askQuestion])
 
-  // Handle upload — uses Gemma 4 vision or text to extract fields
+  // Handles custom document uploads (vision-based pipeline parsing)
   const handleDocumentExtracted = useCallback(async ({ mode, text, base64, mimeType }) => {
     setExtracting(true)
     try {
       const prompt = buildFieldExtractionPrompt(text || 'Extract all form fields from this image.')
 
-      // Use call() not callJSON() — we do our own robust parsing
       const { text: rawResponse } = await call({
         systemPrompt: SYSTEM_PROMPTS.formHelper,
         userPrompt: prompt.userPrompt,
@@ -129,7 +151,7 @@ export function FormFiller({ onProviderChange }) {
 
       const result = parseFieldsFromResponse(rawResponse)
       const extractedFields = result?.fields || []
-      if (extractedFields.length === 0) throw new Error('No fields found. Try a clearer photo or a different document.')
+      if (extractedFields.length === 0) throw new Error('No fields found.')
 
       setFields(extractedFields)
       setStage('filling')
@@ -143,11 +165,12 @@ export function FormFiller({ onProviderChange }) {
     }
   }, [call, askQuestion])
 
+  // Handles input submissions (validates input formats like Phone/NIN/Date and saves to IDB caches)
   const submitAnswer = useCallback(async (value) => {
     const v = String(value).trim()
 
     if (!v && currentField?.required) {
-      const msg = 'This field is required. Please enter an answer.'
+      const msg = t.formRequiredError
       setValidationMsg(msg)
       speak(msg)
       return
@@ -175,9 +198,9 @@ export function FormFiller({ onProviderChange }) {
       askQuestion(nextIndex, fields, newAnswers)
     } else {
       setStage('review')
-      speak('Great job! Please review your answers.')
+      speak(lang === 'ha' ? 'An gama! Don Allah duba amsoshinka kafin ka ajiye.' : 'All done! Please review your answers.')
     }
-  }, [currentField, answers, currentIndex, fields, sessionId, speak, askQuestion, saveFormProgress])
+  }, [currentField, answers, currentIndex, fields, sessionId, speak, askQuestion, saveFormProgress, t, lang])
 
   const goBack = useCallback(() => {
     if (currentIndex > 0) {
@@ -191,13 +214,13 @@ export function FormFiller({ onProviderChange }) {
 
   useEffect(() => { inputRef.current?.focus() }, [currentIndex])
 
-  // ── SELECT ──────────────────────────────────────────────────────────────
+  // Stage 1: Selection screen for template lists (Mobile optimized, generous touch targets)
   if (stage === 'select') {
     return (
       <div className="space-y-6 animate-fade-up">
         <div>
-          <h2 className="font-display text-2xl font-bold text-paper mb-1">Fill a Form</h2>
-          <p className="text-white/50 text-sm">Choose a template or upload your own form. I'll guide you one question at a time.</p>
+          <h2 className="font-display text-2xl font-bold text-paper mb-1">{t.formTitle}</h2>
+          <p className="text-white/50 text-sm">{t.formDesc}</p>
         </div>
 
         <div className="grid gap-3">
@@ -216,7 +239,7 @@ export function FormFiller({ onProviderChange }) {
               <div>
                 <p className="font-display font-semibold text-paper">{tmpl.label}</p>
                 <p className="text-white/40 text-xs mt-0.5">
-                  {tmpl.fields ? `${tmpl.fields.length} questions` : 'Upload PDF or photo'}
+                  {tmpl.fields ? `${tmpl.fields.length} ${lang === 'ha' ? 'tambayoyi' : lang === 'pcm' ? 'questions' : 'questions'}` : t.formUploadLabel}
                 </p>
               </div>
               <svg className="w-4 h-4 text-white/20 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -231,10 +254,10 @@ export function FormFiller({ onProviderChange }) {
             {extracting ? (
               <div className="flex items-center gap-3 p-4 card">
                 <div className="w-6 h-6 border-2 border-amber border-t-transparent rounded-full animate-spin flex-shrink-0"/>
-                <p className="text-white/60 text-sm">Gemma 4 is reading your form…</p>
+                <p className="text-white/60 text-sm">{t.formReading}</p>
               </div>
             ) : (
-              <DocumentUploader label="Upload your form (PDF or photo)" onExtracted={handleDocumentExtracted}/>
+              <DocumentUploader label={t.formUploadLabel} onExtracted={handleDocumentExtracted}/>
             )}
           </div>
         )}
@@ -242,17 +265,17 @@ export function FormFiller({ onProviderChange }) {
     )
   }
 
-  // ── FILLING ─────────────────────────────────────────────────────────────
+  // Stage 2: Question-by-question flow
   if (stage === 'filling') {
     return (
       <div className="space-y-6 animate-fade-up">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-xl font-bold">{template?.label || 'Your Form'}</h2>
+          <h2 className="font-display text-xl font-bold">{template?.label || 'Document Form'}</h2>
           <button
             onClick={toggleAutoRead}
             className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${autoRead ? 'border-teal/50 text-teal bg-teal/10' : 'border-white/20 text-white/40'}`}
           >
-            {autoRead ? '🔊 Voice on' : '🔇 Voice off'}
+            {autoRead ? t.formSpeechOn : t.formSpeechOff}
           </button>
         </div>
 
@@ -274,7 +297,7 @@ export function FormFiller({ onProviderChange }) {
               value={currentInput}
               onChange={e => setCurrentInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && submitAnswer(currentInput)}
-              placeholder="Type your answer here…"
+              placeholder={t.formPlaceholder}
               className="input-field flex-1"
               aria-label={currentField?.label}
               disabled={loading}
@@ -289,29 +312,31 @@ export function FormFiller({ onProviderChange }) {
 
         <div className="flex gap-3">
           {currentIndex > 0 && (
-            <button onClick={goBack} className="btn-secondary flex-1">← Back</button>
+            <button onClick={goBack} className="btn-secondary flex-1">{t.formBack}</button>
           )}
           <button onClick={() => submitAnswer(currentInput)} disabled={loading} className="btn-primary flex-1">
-            {currentIndex === fields.length - 1 ? 'Review Answers →' : 'Next →'}
+            {currentIndex === fields.length - 1 ? t.formReview : t.formNext}
           </button>
         </div>
 
         {!currentField?.required && (
           <button onClick={() => submitAnswer('')} className="w-full text-white/30 text-sm hover:text-white/50 transition-colors">
-            Skip this question
+            {t.formSkip}
           </button>
         )}
       </div>
     )
   }
 
-  // ── REVIEW ──────────────────────────────────────────────────────────────
+  // Stage 3: Summary reviews with editable input triggers
   if (stage === 'review') {
     return (
       <div className="space-y-6 animate-fade-up">
         <div>
-          <h2 className="font-display text-2xl font-bold">Review Your Answers</h2>
-          <p className="text-white/50 text-sm">Check everything looks right. Tap any answer to change it.</p>
+          <h2 className="font-display text-2xl font-bold">{lang === 'ha' ? 'Duba Amsoshinka' : 'Review Your Answers'}</h2>
+          <p className="text-white/50 text-sm">
+            {lang === 'ha' ? 'Tabbatar komai daidai ne. Kuna iya danna kowanne don gyarawa.' : 'Check everything looks right. Tap any answer to change it.'}
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -320,7 +345,7 @@ export function FormFiller({ onProviderChange }) {
               <div className="flex-1 min-w-0">
                 <p className="text-white/40 text-xs uppercase tracking-wide mb-0.5">{field.label}</p>
                 <p className="text-paper font-medium truncate">
-                  {answers[field.id] || <span className="text-white/20 italic">Not answered</span>}
+                  {answers[field.id] || <span className="text-white/20 italic">{lang === 'ha' ? 'Ba a amsa ba' : 'Not answered'}</span>}
                 </p>
               </div>
               <button
@@ -331,19 +356,21 @@ export function FormFiller({ onProviderChange }) {
                   askQuestion(i, fields, answers)
                 }}
                 className="text-amber text-xs hover:underline flex-shrink-0"
-              >Edit</button>
+              >
+                {lang === 'ha' ? 'Gyara' : 'Edit'}
+              </button>
             </div>
           ))}
         </div>
 
         <button onClick={() => setStage('done')} className="btn-primary w-full text-lg py-4">
-          ✓ All Done — Save My Answers
+          {t.formAllDone}
         </button>
       </div>
     )
   }
 
-  // ── DONE ─────────────────────────────────────────────────────────────────
+  // Stage 4: Completed output files (JSON and localized restarts)
   if (stage === 'done') {
     const downloadJSON = () => {
       const data = {}
@@ -359,18 +386,23 @@ export function FormFiller({ onProviderChange }) {
       <div className="flex flex-col items-center gap-6 py-8 text-center animate-fade-up">
         <div className="w-20 h-20 rounded-full bg-teal/20 flex items-center justify-center text-4xl">✓</div>
         <div>
-          <h2 className="font-display text-2xl font-bold">Form Complete!</h2>
-          <p className="text-white/50 text-sm mt-1">Great job — all {fields.length} questions answered.</p>
+          <h2 className="font-display text-2xl font-bold">{lang === 'ha' ? 'An Kammala Fom!' : 'Form Complete!'}</h2>
+          <p className="text-white/50 text-sm mt-1">
+            {lang === 'ha'
+              ? `Kyakkyawan aiki — an amsa dukkan tambayoyi ${fields.length}.`
+              : `Great job — all ${fields.length} questions answered.`}
+          </p>
         </div>
         <div className="flex flex-col gap-3 w-full">
-          <button onClick={downloadJSON} className="btn-primary w-full">Download My Answers (JSON)</button>
+          <button onClick={downloadJSON} className="btn-primary w-full">{t.formDownload}</button>
           <button
             onClick={() => { setStage('select'); setTemplate(null); setAnswers({}); setFields([]) }}
             className="btn-secondary w-full"
-          >Fill Another Form</button>
+          >
+            {t.formAnother}
+          </button>
         </div>
       </div>
     )
   }
-      }
-       
+}

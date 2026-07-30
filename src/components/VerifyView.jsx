@@ -1,5 +1,10 @@
+// VerifyView.jsx
+// React component implementing document verification forensics for low-literacy users.
+// Analyzes certificates, ID cards, and school letters to determine digital alterations or AI generation.
+// It integrates client-side image signal extractors (ELA, FFT, Noise Consistency, OpenCV line detection)
+// and leverages Gemma 4 to produce clean summaries translated into Hausa, English, or Pidgin.
+
 import { TRANSLATIONS } from '../utils/translations'
-// src/components/VerifyView.jsx
 import { useState, useCallback, useRef } from 'react'
 import { useGeminiAPI } from '../hooks/useGeminiAPI'
 import { useTTS } from '../hooks/useTTS'
@@ -13,8 +18,9 @@ import {
   parseJPEGQuantization
 } from '../utils/forensics'
 
-export function VerifyView({ lang = 'en' }) {
-  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+export function VerifyView({ lang = 'ha' }) {
+  // Pull language-specific translations (defaulting to Hausa)
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.ha;
 
   const [doc, setDoc] = useState(null)
   const [forensicSignals, setForensicSignals] = useState(null)
@@ -27,25 +33,32 @@ export function VerifyView({ lang = 'en' }) {
   const { speak } = useTTS()
   const imageRef = useRef(null)
 
+  // Accordion controller for the detailed signals report
   const toggleSection = (index) => {
     setExpandedSections(prev => ({ ...prev, [index]: !prev[index] }))
   }
 
   const handleDocumentSelected = useCallback((extractedData) => {
     setDoc(extractedData)
-    // Clear old state
     setForensicSignals(null)
     setReport(null)
     setStage('upload')
   }, [])
 
+  /**
+   * Executes the pipeline:
+   * 1. Renders selected image onto a hidden canvas.
+   * 2. Runs classical image metrics client-side (ELA, FFT, local variance, text alignments).
+   * 3. Queries Gemma 4 via system and user prompts passing raw metrics.
+   * 4. Converts the response JSON to a user-friendly report and reads out the summary aloud.
+   */
   const runAnalysis = useCallback(async () => {
     if (!doc) return
     setStage('processing')
     setLoadingMsg(t.verifyProcessingDesc)
 
     try {
-      // 1. Load Image Element for client-side pixel extraction
+      // 1. Create a dynamic image element from base64
       const img = new Image()
       img.src = `data:${doc.mimeType || 'image/jpeg'};base64,${doc.base64}`
 
@@ -54,7 +67,7 @@ export function VerifyView({ lang = 'en' }) {
         img.onerror = () => reject(new Error('Failed to render document image on canvas'))
       })
 
-      // 2. Perform Classical Client-Side Image Forensics
+      // 2. Perform Client-Side classical image forensic extraction
       setLoadingMsg(t.verifyProcessingDesc)
       const elaResult = await performELA(img, 0.85)
 
@@ -70,6 +83,7 @@ export function VerifyView({ lang = 'en' }) {
       setLoadingMsg(t.verifyProcessingDesc)
       const dqtResult = await parseJPEGQuantization(doc.file)
 
+      // Package everything in a single payload
       const signals = {
         ela: { score: elaResult.score, heatmapDataUrl: elaResult.heatmapDataUrl },
         fft: fftResult,
@@ -88,7 +102,7 @@ export function VerifyView({ lang = 'en' }) {
 
       setForensicSignals(signals)
 
-      // 3. Send raw signals to Gemma 4 to formulate verdict and report
+      // 3. Request LLM Report from Gemma 4
       setLoadingMsg(t.verifyProcessingDesc)
       const prompt = buildVerifyPrompt(signals, lang)
       const reportResponse = await callJSON({
@@ -101,6 +115,7 @@ export function VerifyView({ lang = 'en' }) {
       setReport(reportResponse)
       setStage('results')
 
+      // Use Text-to-Speech to read results to low-literacy users
       if (reportResponse.summary) {
         speak(reportResponse.summary)
       }
@@ -108,7 +123,7 @@ export function VerifyView({ lang = 'en' }) {
       alert(`Verification analysis failed: ${err.message}`)
       setStage('upload')
     }
-  }, [doc, callJSON, speak])
+  }, [doc, callJSON, speak, lang, t])
 
   const reset = () => {
     setDoc(null)
@@ -118,7 +133,7 @@ export function VerifyView({ lang = 'en' }) {
     setLoadingMsg('')
   }
 
-  // --- UPLOAD STAGE ---
+  // --- UPLOAD VIEW ---
   if (stage === 'upload') {
     return (
       <div className="space-y-6 animate-fade-up">
@@ -152,7 +167,7 @@ export function VerifyView({ lang = 'en' }) {
     )
   }
 
-  // --- PROCESSING STAGE ---
+  // --- LOADING/PROCESSING VIEW ---
   if (stage === 'processing') {
     return (
       <div className="flex flex-col items-center gap-6 py-16 text-center animate-fade-up">
@@ -169,7 +184,7 @@ export function VerifyView({ lang = 'en' }) {
     )
   }
 
-  // --- RESULTS STAGE ---
+  // Map classification categories to visual severity indicators
   const classificationColors = {
     'genuine': 'border-teal/30 bg-teal/5 text-teal-light',
     'edited-genuine': 'border-amber/30 bg-amber/5 text-amber',
@@ -187,12 +202,12 @@ export function VerifyView({ lang = 'en' }) {
 
       {report && (
         <>
-          {/* Main prominence card */}
+          {/* Verdict Box */}
           <div className={`card p-5 border-2 ${classificationColors[report.classification] || 'border-amber/20 bg-amber/5'} space-y-3`}>
             <div className="flex items-center justify-between">
               <span className="text-white/40 text-xs uppercase tracking-widest">{t.verifyClassification}</span>
               <span className="text-xs px-2.5 py-1 rounded-full bg-white/10 font-semibold font-mono">
-                Score: {report.confidenceScore}%
+                {t.verifyConfidence}: {report.confidenceScore}%
               </span>
             </div>
             <p className="text-2xl font-display font-black capitalize leading-none">
@@ -201,12 +216,12 @@ export function VerifyView({ lang = 'en' }) {
             <p className="text-paper text-sm leading-relaxed">{report.summary}</p>
             {report.recommendation && (
               <div className="pt-2 border-t border-white/5 text-xs font-medium">
-                💡 Recommendation: {report.recommendation}
+                💡 {report.recommendation}
               </div>
             )}
           </div>
 
-          {/* ELA Heatmap Viewer */}
+          {/* Canvas ELA Heatmap Preview */}
           {forensicSignals?.ela?.heatmapDataUrl && (
             <div className="card p-4 space-y-2">
               <p className="font-display font-bold text-sm text-paper/80">{t.verifyHeatmapTitle}</p>
@@ -223,7 +238,7 @@ export function VerifyView({ lang = 'en' }) {
             </div>
           )}
 
-          {/* Detailed Forensic Section Accordions */}
+          {/* Section Breakdowns */}
           <div className="space-y-3">
             <h3 className="font-display font-semibold text-paper/80">{t.verifySignalsTitle}</h3>
             {report.sections?.map((section, idx) => {
@@ -241,7 +256,7 @@ export function VerifyView({ lang = 'en' }) {
                     <div className="p-4 pt-0 border-t border-white/5 bg-white/[0.01] space-y-2 animate-fade-down">
                       <p className="text-paper/90 text-sm leading-relaxed">{section.finding}</p>
                       {section.implication && (
-                        <p className="text-white/40 text-xs italic">🔍 Implication: {section.implication}</p>
+                        <p className="text-white/40 text-xs italic">🔍 {section.implication}</p>
                       )}
                     </div>
                   )}
