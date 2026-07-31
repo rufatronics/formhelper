@@ -36,6 +36,7 @@ export const TRANSLATIONS = {
     formSkip: 'Ketare wannan tambayar',
     formUploadLabel: 'Saka hoton takardarku (PDF ko Hoto)',
     formVoicePlaceholder: 'Yi magana anan...',
+    formLayoutGuideHeader: '📍 Inda wannan bayani yake a takarda (Layout Guide):',
 
     // Templates
     tmplNID: 'Rikodin Katin Dan Kasa (NIN)',
@@ -47,29 +48,39 @@ export const TRANSLATIONS = {
     tmplCustom: 'Saka Hoton Takarda Ta Da Kaina',
     tmplCustomDesc: 'Saka hoton kowace takarda don a taimaka maka',
 
-    // Fields labels and helpText in Hausa
+    // Fields labels, helpText, and layout guides in Hausa
     fieldNINName: 'Cikakken Suna',
     fieldNINNameHelp: 'Sunan da ke jikin katin zabe ko na haihuwa.',
+    fieldNINNameGuide: 'Duba sashin farko na sama can hagu, karkashin hoton tambarin Najeriya.',
     fieldNINDob: 'Ranar Haihuwa',
     fieldNINDobHelp: 'Shekarar da aka haife ku.',
+    fieldNINDobGuide: 'Yana nan karkashin sunanku daidai a gefen hagu.',
     fieldNINPhone: 'Lambar Waya',
     fieldNINPhoneHelp: 'Lambar wayarku da aka yi muku rijista da ita.',
+    fieldNINPhoneGuide: 'Yana tsakiyar katin kusa da hoton fuskarku.',
     fieldNINState: 'Jihar Asali',
     fieldNINStateHelp: 'Jihar da iyayenku suka fito a Najeriya.',
+    fieldNINStateGuide: 'Duba kasan katin gefen dama can kasa kusa da sunan mahaifa.',
 
     fieldAdmName: 'Sunan Dalibin',
     fieldAdmNameHelp: 'Cikakken sunan dalibin da aka yarda ya shiga makaranta.',
+    fieldAdmNameGuide: 'Yana can cikin sakin layi na farko ko na biyu bayan gaisuwar ban girma.',
     fieldAdmReg: 'Lambar Rijista',
     fieldAdmRegHelp: 'Lambar jarabawa ko ta rijistar JAMB.',
+    fieldAdmRegGuide: 'Duba saman wasikar can sama gefen dama kusa da kwanan wata.',
     fieldAdmCourse: 'Darasi/Hanya',
     fieldAdmCourseHelp: 'Abin da za a koya (misali, Kimiyya ko Kasuwanci).',
+    fieldAdmCourseGuide: 'Yana nan a bayyane a cikin sakin layi na biyu na wasikar.',
 
     fieldTenTenant: 'Sunan Dan Haya',
     fieldTenTenantHelp: 'Sunan mutumin da ke son yin hayan gidan.',
+    fieldTenTenantGuide: 'Duba cikin sakin layi na farko can kusa da kwanan wata na yarjejeniyar.',
     fieldTenRent: 'Kudin Haya na Shekara',
     fieldTenRentHelp: 'Adadin kudin da za a biya na shekara daya.',
+    fieldTenRentGuide: 'Duba tsakiyar takardar a sashin da aka rubuta kudi (misali, N200,000) a cikin baka.',
     fieldTenWitness: 'Sunan Shaidu',
     fieldTenWitnessHelp: 'Suna ko lambar wayar mutumin da ya shaida yarjejeniyar.',
+    fieldTenWitnessGuide: 'Yana can karshen takardar a kasan wurin sanya hannu.',
 
     // Verify View Strings
     verifyTitle: 'Tantance Takarda',
@@ -123,7 +134,7 @@ export const TRANSLATIONS = {
     // Chat View Strings
     chatTitle: 'Tattaunawa da Kariya AI',
     chatDesc: 'Tambayi komai game da takardu, fom-fom, ko shawarwari na doka cikin harshen Hausa ko Pidgin.',
-    chatPlaceholder: 'Rubuta tambayarku anan...',
+    chatPlaceholder: 'Rubuta tambayarku ko saka hoton takarda don a fassara muku...',
     chatSendBtn: 'Aika →'
   },
   en: {
@@ -152,6 +163,7 @@ export const TRANSLATIONS = {
     formSkip: 'Skip this question',
     formUploadLabel: 'Upload your document (PDF or Photo)',
     formVoicePlaceholder: 'Speak here...',
+    formLayoutGuideHeader: '📍 Where this information is on your document (Layout Guide):',
 
     // Templates
     tmplNID: 'National ID (NIN) Enrollment',
@@ -163,29 +175,39 @@ export const TRANSLATIONS = {
     tmplCustom: 'Upload My Own Form',
     tmplCustomDesc: 'Upload any physical document image',
 
-    // Fields labels and helpText
+    // Fields labels, helpText, and layout guides
     fieldNINName: 'Full Name',
     fieldNINNameHelp: 'Your legal name as it appears on official papers.',
+    fieldNINNameGuide: 'Look at the top left corner of the slip, directly under the Nigerian Coat of Arms.',
     fieldNINDob: 'Date of Birth',
     fieldNINDobHelp: 'The day, month, and year you were born.',
+    fieldNINDobGuide: 'Located directly below your full name field on the left.',
     fieldNINPhone: 'Phone Number',
     fieldNINPhoneHelp: 'Your active mobile number registered with NIMC.',
+    fieldNINPhoneGuide: 'Displayed in the middle column near your profile photograph.',
     fieldNINState: 'State of Origin',
     fieldNINStateHelp: 'The Nigerian state where your parents belong.',
+    fieldNINStateGuide: 'Look at the bottom right-hand column, next to your local government of origin.',
 
     fieldAdmName: 'Student Full Name',
     fieldAdmNameHelp: 'Full name of the student admitted.',
+    fieldAdmNameGuide: 'Written in the opening salutation or first paragraph of the letter.',
     fieldAdmReg: 'Registration Number',
     fieldAdmRegHelp: 'JAMB registration or school portal number.',
+    fieldAdmRegGuide: 'Look at the top right header block, usually near the reference date.',
     fieldAdmCourse: 'Course of Study',
     fieldAdmCourseHelp: 'The program or department (e.g. Science, Art).',
+    fieldAdmCourseGuide: 'Expressed bolded or underlined in the middle admission text paragraph.',
 
     fieldTenTenant: 'Tenant Name',
     fieldTenTenantHelp: 'The name of the person renting the place.',
+    fieldTenTenantGuide: 'Written in the introductory party agreement block on page one.',
     fieldTenRent: 'Annual Rent Amount',
     fieldTenRentHelp: 'Amount of money paid for one year rent.',
+    fieldTenRentGuide: 'Written inside brackets in figures (e.g. N250,000) under the rent duration clause.',
     fieldTenWitness: 'Witness Name',
     fieldTenWitnessHelp: 'The name of a family member or friend present.',
+    fieldTenWitnessGuide: 'Found at the very end of the agreement under witness/friend signature slots.',
 
     // Verify View Strings
     verifyTitle: 'Verify Document',
@@ -239,7 +261,7 @@ export const TRANSLATIONS = {
     // Chat View Strings
     chatTitle: 'Chat with Kariya AI',
     chatDesc: 'Ask anything about legal terms, forms, or scams in English, Hausa, or Pidgin.',
-    chatPlaceholder: 'Type your message here...',
+    chatPlaceholder: 'Type your message or attach a document image here...',
     chatSendBtn: 'Send →'
   },
   pcm: {
@@ -268,6 +290,7 @@ export const TRANSLATIONS = {
     formSkip: 'Skip this question',
     formUploadLabel: 'Upload your document (PDF or Photo)',
     formVoicePlaceholder: 'Talk here...',
+    formLayoutGuideHeader: '📍 Where this thing dey for the paper (Layout Guide):',
 
     // Templates
     tmplNID: 'National ID (NIN) Profile',
@@ -279,29 +302,39 @@ export const TRANSLATIONS = {
     tmplCustom: 'Upload My Own Form',
     tmplCustomDesc: 'Snap any form wey you want make we help you fill',
 
-    // Fields labels and helpText in Pidgin
+    // Fields labels, helpText, and layout guides in Pidgin
     fieldNINName: 'Your Full Name',
     fieldNINNameHelp: 'Write the name wey dey your voter card or birth paper.',
+    fieldNINNameGuide: 'Look the top left corner of the slip, directly under the Nigeria Coat of Arms.',
     fieldNINDob: 'When Dem Born You',
     fieldNINDobHelp: 'Select the day, month, and year you enter world.',
+    fieldNINDobGuide: 'E dey directly under your name for the left hand side.',
     fieldNINPhone: 'Phone Number',
     fieldNINPhoneHelp: 'The mobile number you use register NIN.',
+    fieldNINPhoneGuide: 'E dey the middle next to your picture.',
     fieldNINState: 'State Wey You Comot',
     fieldNINStateHelp: 'The state in Naija where your family comot from.',
+    fieldNINStateGuide: 'Look the bottom right side next to your Local Government.',
 
     fieldAdmName: 'Student Name',
     fieldAdmNameHelp: 'Complete name of the student wey get admission.',
+    fieldAdmNameGuide: 'E dey the first paragraph after greeting.',
     fieldAdmReg: 'Registration Number',
     fieldAdmRegHelp: 'JAMB registration number or school index.',
+    fieldAdmRegGuide: 'Look the top right header, close to the date.',
     fieldAdmCourse: 'Wetin You Dey Study',
     fieldAdmCourseHelp: 'The department (like Engineering or Accounting).',
+    fieldAdmCourseGuide: 'E bold and bold well in the middle paragraph of the letter.',
 
     fieldTenTenant: 'Tenant Name',
     fieldTenTenantHelp: 'The name of the person wey dey pay for the house.',
+    fieldTenTenantGuide: 'E dey inside the first paragraph on page one.',
     fieldTenRent: 'Rent Money Per Year',
     fieldTenRentHelp: 'How much money you dey pay landlord every year.',
+    fieldTenRentGuide: 'E dey written in brackets like this (e.g., N300,000) inside the rent section.',
     fieldTenWitness: 'Witness Name',
     fieldTenWitnessHelp: 'Name of person wey sign say he dey when you pay.',
+    fieldTenWitnessGuide: 'E dey the very last page of the contract paper under signatures.',
 
     // Verify View Strings
     verifyTitle: 'Check If Document Real',
@@ -355,7 +388,8 @@ export const TRANSLATIONS = {
     // Chat View Strings
     chatTitle: 'Talk with Kariya AI',
     chatDesc: 'Ask us any question about agreement, forms, or wayo SMS in English, Hausa, or Pidgin.',
-    chatPlaceholder: 'Write your message here...',
+    chatPlaceholder: 'Write your message or upload paper here...',
     chatSendBtn: 'Send →'
   }
 };
+export default TRANSLATIONS;

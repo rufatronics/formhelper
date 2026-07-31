@@ -21,6 +21,7 @@ import { TRANSLATIONS } from '../utils/translations'
 /**
  * Returns localized templates configured specifically for Nigerian document contexts (NIN, School Admission, Tenancy).
  * Dynamically binds names, labels, and helper prompts to the user's active selected language.
+ * Includes precise visual layout guide strings for low-literacy users.
  *
  * @param {string} lang - Active language ID ('ha', 'en', 'pcm')
  * @returns {Array<Object>} Localized templates list
@@ -33,10 +34,10 @@ function getLocalizedTemplates(lang) {
       label: t.tmplNID,
       icon: '🇳🇬',
       fields: [
-        { id: 'full_name',      label: t.fieldNINName,       type: 'name',    required: true,  helpText: t.fieldNINNameHelp },
-        { id: 'dob',            label: t.fieldNINDob,        type: 'date',    required: true,  helpText: t.fieldNINDobHelp },
-        { id: 'phone',          label: t.fieldNINPhone,      type: 'phone',   required: true,  helpText: t.fieldNINPhoneHelp },
-        { id: 'state_origin',   label: t.fieldNINState,      type: 'text',    required: true,  helpText: t.fieldNINStateHelp }
+        { id: 'full_name',      label: t.fieldNINName,       type: 'name',    required: true,  helpText: t.fieldNINNameHelp, layoutGuide: t.fieldNINNameGuide },
+        { id: 'dob',            label: t.fieldNINDob,        type: 'date',    required: true,  helpText: t.fieldNINDobHelp, layoutGuide: t.fieldNINDobGuide },
+        { id: 'phone',          label: t.fieldNINPhone,      type: 'phone',   required: true,  helpText: t.fieldNINPhoneHelp, layoutGuide: t.fieldNINPhoneGuide },
+        { id: 'state_origin',   label: t.fieldNINState,      type: 'text',    required: true,  helpText: t.fieldNINStateHelp, layoutGuide: t.fieldNINStateGuide }
       ]
     },
     {
@@ -44,9 +45,9 @@ function getLocalizedTemplates(lang) {
       label: t.tmplAdmission,
       icon: '🏫',
       fields: [
-        { id: 'student_name',   label: t.fieldAdmName,       type: 'name',    required: true,  helpText: t.fieldAdmNameHelp },
-        { id: 'reg_num',        label: t.fieldAdmReg,        type: 'text',    required: true,  helpText: t.fieldAdmRegHelp },
-        { id: 'course',         label: t.fieldAdmCourse,     type: 'text',    required: true,  helpText: t.fieldAdmCourseHelp }
+        { id: 'student_name',   label: t.fieldAdmName,       type: 'name',    required: true,  helpText: t.fieldAdmNameHelp, layoutGuide: t.fieldAdmNameGuide },
+        { id: 'reg_num',        label: t.fieldAdmReg,        type: 'text',    required: true,  helpText: t.fieldAdmRegHelp, layoutGuide: t.fieldAdmRegGuide },
+        { id: 'course',         label: t.fieldAdmCourse,     type: 'text',    required: true,  helpText: t.fieldAdmCourseHelp, layoutGuide: t.fieldAdmCourseGuide }
       ]
     },
     {
@@ -54,9 +55,9 @@ function getLocalizedTemplates(lang) {
       label: t.tmplTenancy,
       icon: '📜',
       fields: [
-        { id: 'tenant_name',    label: t.fieldTenTenant,     type: 'name',    required: true,  helpText: t.fieldTenTenantHelp },
-        { id: 'rent_amount',    label: t.fieldTenRent,       type: 'number',  required: true,  helpText: t.fieldTenRentHelp },
-        { id: 'witness_name',   label: t.fieldTenWitness,    type: 'text',    required: false, helpText: t.fieldTenWitnessHelp }
+        { id: 'tenant_name',    label: t.fieldTenTenant,     type: 'name',    required: true,  helpText: t.fieldTenTenantHelp, layoutGuide: t.fieldTenTenantGuide },
+        { id: 'rent_amount',    label: t.fieldTenRent,       type: 'number',  required: true,  helpText: t.fieldTenRentHelp, layoutGuide: t.fieldTenRentGuide },
+        { id: 'witness_name',   label: t.fieldTenWitness,    type: 'text',    required: false, helpText: t.fieldTenWitnessHelp, layoutGuide: t.fieldTenWitnessGuide }
       ]
     },
     {
@@ -308,6 +309,14 @@ export function FormFiller({ onProviderChange, lang = 'ha' }) {
 
           {validationMsg && <p role="alert" className="text-amber text-sm">{validationMsg}</p>}
           {currentField?.helpText && <p className="text-white/30 text-xs">{currentField.helpText}</p>}
+
+          {/* Highlighted visual layout guide for low-literacy individuals */}
+          {currentField?.layoutGuide && (
+            <div className="bg-amber/10 border border-amber/30 rounded-xl p-3 text-xs text-amber-light animate-fade-up">
+              <span className="font-semibold block mb-1 text-amber">📍 {t.formLayoutGuideHeader}</span>
+              <p className="text-paper/80 leading-relaxed">{currentField.layoutGuide}</p>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3">

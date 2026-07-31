@@ -2,10 +2,9 @@
 // Calls OpenRouter first (fast), falls back to Google Gemini API if it fails.
 // Both called directly from the browser — no Vercel proxy needed.
 // Keys are in Vite env vars: VITE_OPENROUTER_KEY and VITE_GEMINI_KEY
+// Gracefully handles 429 rate limit issues by auto-switching channels.
 
 import { useState, useCallback, useRef } from 'react'
-
-// ─── Config ────────────────────────────────────────────────────────────────
 
 const OR_KEY    = import.meta.env.VITE_OPENROUTER_KEY  || ''
 const GEM_KEY   = import.meta.env.VITE_GEMINI_KEY      || ''
@@ -17,8 +16,6 @@ const OR_MODEL  = 'google/gemma-4-26b-a4b-it'
 
 const DEFAULT_TOKENS = 512
 const TIMEOUT_MS     = 20000   // 20s — if OR doesn't start in 20s, fall back
-
-// ─── Helpers ───────────────────────────────────────────────────────────────
 
 function cleanText(text) {
   return text
@@ -38,7 +35,6 @@ function parseJSON(text) {
   try { return JSON.parse(clean) } catch { return null }
 }
 
-// Build Gemini-style contents array
 function buildContents(prompt, history = [], imageBase64 = null, mimeType = null) {
   const contents = []
   for (const msg of history.slice(-6)) {
@@ -53,7 +49,6 @@ function buildContents(prompt, history = [], imageBase64 = null, mimeType = null
   return contents
 }
 
-// Build OpenAI-compatible messages for OpenRouter
 function buildMessages(systemPrompt, userPrompt, history = [], imageBase64 = null, mimeType = null) {
   const messages = []
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt })
@@ -74,9 +69,6 @@ function buildMessages(systemPrompt, userPrompt, history = [], imageBase64 = nul
   return messages
 }
 
-// ─── Stream readers ────────────────────────────────────────────────────────
-
-// OpenRouter uses OpenAI SSE format: choices[0].delta.content
 async function readORStream(response, onChunk = null) {
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
@@ -107,7 +99,6 @@ async function readORStream(response, onChunk = null) {
   return cleanText(fullText)
 }
 
-// Gemini uses its own SSE format: candidates[0].content.parts[0].text
 async function readGemStream(response, onChunk = null) {
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
@@ -140,8 +131,6 @@ async function readGemStream(response, onChunk = null) {
   return cleanText(fullText)
 }
 
-// ─── Provider calls ────────────────────────────────────────────────────────
-
 async function callOpenRouter({ systemPrompt, userPrompt, history, imageBase64, mimeType, temperature, maxTokens, onChunk }) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
@@ -152,7 +141,7 @@ async function callOpenRouter({ systemPrompt, userPrompt, history, imageBase64, 
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${OR_KEY}`,
       'HTTP-Referer': window.location.origin,
-      'X-Title': 'ClearForm'
+      'X-Title': 'Kariya'
     },
     body: JSON.stringify({
       model: OR_MODEL,
@@ -165,6 +154,9 @@ async function callOpenRouter({ systemPrompt, userPrompt, history, imageBase64, 
   })
 
   clearTimeout(timer)
+  if (res.status === 429) {
+    throw new Error('RATE_LIMIT')
+  }
   if (!res.ok) throw new Error(`OpenRouter ${res.status}`)
   return readORStream(res, onChunk)
 }
@@ -173,7 +165,7 @@ async function callGemini({ systemPrompt, userPrompt, history, imageBase64, mime
   const endpoint = `${GEM_BASE}/${GEM_MODEL}:streamGenerateContent?alt=sse&key=${GEM_KEY}`
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 55000) // Gemini gets more time as fallback
+  const timer = setTimeout(() => controller.abort(), 55000)
 
   const res = await fetch(endpoint, {
     method: 'POST',
@@ -191,11 +183,12 @@ async function callGemini({ systemPrompt, userPrompt, history, imageBase64, mime
   })
 
   clearTimeout(timer)
+  if (res.status === 429) {
+    throw new Error('RATE_LIMIT')
+  }
   if (!res.ok) throw new Error(`Gemini ${res.status}`)
   return readGemStream(res, onChunk)
 }
-
-// ─── Main call with fallback ───────────────────────────────────────────────
 
 async function callWithFallback(options, onChunk = null) {
   const { onProviderSwitch } = options
@@ -207,24 +200,33 @@ async function callWithFallback(options, onChunk = null) {
       if (text) return text
       throw new Error('Empty response')
     } catch (err) {
-      console.warn('OpenRouter failed, falling back to Gemini:', err.message)
+      if (err.message === 'RATE_LIMIT') {
+        console.warn('OpenRouter is rate limited (429). Falling back immediately to direct Gemini endpoint...')
+      } else {
+        console.warn('OpenRouter failed, falling back to Gemini:', err.message)
+      }
       onProviderSwitch?.('gemini')
-      // Fall through to Gemini
     }
   }
 
-  // Gemini fallback (or primary if no OR key)
-  if (!GEM_KEY) throw new Error('No API keys configured. Add VITE_OPENROUTER_KEY or VITE_GEMINI_KEY to your Vercel environment variables.')
-  return callGemini({ ...options, onChunk })
-}
+  // Gemini fallback
+  if (!GEM_KEY) throw new Error('No API keys configured. Please add VITE_OPENROUTER_KEY or VITE_GEMINI_KEY to your environment.')
 
-// ─── Hook ──────────────────────────────────────────────────────────────────
+  try {
+    return await callGemini({ ...options, onChunk })
+  } catch (err) {
+    if (err.message === 'RATE_LIMIT') {
+      throw new Error('SERVER_BUSY')
+    }
+    throw err
+  }
+}
 
 export function useGeminiAPI() {
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState(null)
   const [streamText, setStreamText] = useState('')
-  const [provider, setProvider]     = useState('openrouter') // for UI indicator
+  const [provider, setProvider]     = useState('openrouter')
 
   const call = useCallback(async ({
     systemPrompt, userPrompt, history = [],
@@ -245,9 +247,12 @@ export function useGeminiAPI() {
       if (!text) throw new Error('Empty response. Please try again.')
       return { text }
     } catch (err) {
-      const msg = err.name === 'AbortError'
-        ? 'Request timed out. Check your connection and try again.'
-        : err.message
+      let msg = err.message
+      if (err.message === 'SERVER_BUSY') {
+        msg = 'Wuraren sabis ɗinmu suna cike da aiki (Rate limit). Don Allah a jira sakan biyar kafin a sake gwadawa. / Server is currently busy (Rate limit). Please wait 5 seconds and try again.'
+      } else if (err.name === 'AbortError') {
+        msg = 'Gwadawa ta katse saboda jinkiri. / Timed out. Check connection.'
+      }
       setError(msg)
       throw new Error(msg)
     } finally {
@@ -258,6 +263,7 @@ export function useGeminiAPI() {
   const stream = useCallback(async ({
     systemPrompt, userPrompt, history = [],
     temperature = 0.3, maxTokens = DEFAULT_TOKENS,
+    imageBase64 = null, mimeType = null,
     onChunk = null
   }) => {
     setLoading(true)
@@ -267,6 +273,7 @@ export function useGeminiAPI() {
     try {
       const fullText = await callWithFallback({
         systemPrompt, userPrompt, history,
+        imageBase64, mimeType,
         temperature, maxTokens,
         onProviderSwitch: (p) => setProvider(p)
       }, (delta, cleaned) => {
@@ -275,9 +282,12 @@ export function useGeminiAPI() {
       })
       return fullText
     } catch (err) {
-      const msg = err.name === 'AbortError'
-        ? 'Timed out. Check your connection and try again.'
-        : err.message
+      let msg = err.message
+      if (err.message === 'SERVER_BUSY') {
+        msg = 'Wuraren sabis ɗinmu suna cike da aiki (Rate limit). Don Allah a jira sakan biyar kafin a sake gwadawa. / Server is currently busy (Rate limit). Please wait 5 seconds and try again.'
+      } else if (err.name === 'AbortError') {
+        msg = 'Gwadawa ta katse saboda jinkiri. / Timed out. Check connection.'
+      }
       setError(msg)
       throw new Error(msg)
     } finally {
