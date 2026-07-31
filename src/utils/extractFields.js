@@ -74,3 +74,5 @@ function guessType(label) {
   if (/note|comment|describe/.test(l))     return 'textarea'
   return 'text'
 }
+
+// .

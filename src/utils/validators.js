@@ -41,3 +41,5 @@ export function normalizeAnswer(type, value) {
     default: return value.trim()
   }
 }
+
+// .

@@ -294,3 +294,5 @@ export function useGeminiAPI() {
 
   return { call, stream, callJSON, loading, error, streamText, provider }
 }
+
+// .

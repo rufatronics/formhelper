@@ -102,3 +102,5 @@ export function useTTS() {
 
   return { speak, stop, speaking, supported, autoRead, toggleAutoRead }
       }
+
+// .

@@ -53,3 +53,5 @@ export function useSpeechRecognition({ onResult, onError, language = 'en-US' } =
 
   return { isListening, transcript, supported, startListening, stopListening, toggle }
 }
+
+// .

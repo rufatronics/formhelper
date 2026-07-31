@@ -17,3 +17,5 @@ export function ProgressIndicator({ current, total, className = '' }) {
     </div>
   )
 }
+
+// .
