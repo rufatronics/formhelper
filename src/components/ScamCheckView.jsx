@@ -1,5 +1,9 @@
+// ScamCheckView.jsx
+// React component supporting scam and SMS fraud checks tailored for Nigerian phone and job scam contexts.
+// Parses pasted/spoken SMS messages, parses URLs and domain risk metrics, and uses Gemma 4
+// to output a structured safety report available in Hausa, English, or Pidgin English.
+
 import { TRANSLATIONS } from '../utils/translations'
-// src/components/ScamCheckView.jsx
 import { useState, useCallback } from 'react'
 import { useGeminiAPI } from '../hooks/useGeminiAPI'
 import { useTTS } from '../hooks/useTTS'
@@ -7,8 +11,9 @@ import { VoiceInput } from './VoiceInput'
 import { extractScamFeatures } from '../utils/scamParser'
 import { buildScamCheckPrompt } from '../utils/prompts'
 
-export function ScamCheckView({ lang = 'en' }) {
-  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+export function ScamCheckView({ lang = 'ha' }) {
+  // Bind UI labels dynamically to translations dictionary (defaults to Hausa)
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.ha;
 
   const [inputText, setInputText] = useState('')
   const [report, setReport] = useState(null)
@@ -18,15 +23,21 @@ export function ScamCheckView({ lang = 'en' }) {
   const { callJSON, loading } = useGeminiAPI()
   const { speak } = useTTS()
 
+  /**
+   * Runs the scam check pipeline:
+   * 1. Extracts linguistic metadata and URLs from user's text message.
+   * 2. Packages payload and queries Gemma 4.
+   * 3. Renders result risk card and reads aloud plain-language summary via TTS.
+   */
   const runAnalysis = useCallback(async () => {
     if (!inputText.trim()) return
     setStage('processing')
 
     try {
-      // 1. Classical client-side link and token features parser
+      // 1. Run local feature/link extractor
       const scamPayload = extractScamFeatures(inputText)
 
-      // 2. Query Gemma 4 with parsed message features and extracted links
+      // 2. Formulate dynamic localized prompt and query Gemma 4
       const prompt = buildScamCheckPrompt(scamPayload, lang)
       const reportResponse = await callJSON({
         systemPrompt: prompt.systemPrompt,
@@ -38,6 +49,7 @@ export function ScamCheckView({ lang = 'en' }) {
       setReport(reportResponse)
       setStage('results')
 
+      // Use Text-to-Speech to read results to user
       if (reportResponse.summary) {
         speak(reportResponse.summary)
       }
@@ -45,7 +57,7 @@ export function ScamCheckView({ lang = 'en' }) {
       alert(`Scam evaluation failed: ${err.message}`)
       setStage('input')
     }
-  }, [inputText, callJSON, speak])
+  }, [inputText, callJSON, speak, lang])
 
   const reset = () => {
     setInputText('')
@@ -105,7 +117,7 @@ export function ScamCheckView({ lang = 'en' }) {
     )
   }
 
-  // --- RESULTS STAGE ---
+  // Map risk metrics to clear color codes
   const riskColors = {
     low: 'border-teal/30 bg-teal/5 text-teal-light',
     medium: 'border-amber/30 bg-amber/5 text-amber',
@@ -121,26 +133,26 @@ export function ScamCheckView({ lang = 'en' }) {
 
       {report && (
         <>
-          {/* Main Risk level prominent card */}
+          {/* Prominent Risk Level Card */}
           <div className={`card p-5 border-2 ${riskColors[report.riskLevel] || 'border-amber/20 bg-amber/5'} space-y-3`}>
             <div className="flex items-center justify-between">
               <span className="text-white/40 text-xs uppercase tracking-widest">{t.scamRisk}</span>
               <span className="text-xs px-2.5 py-1 rounded-full bg-white/10 font-semibold font-mono capitalize">
-                {report.riskLevel} Risk
+                {report.riskLevel}
               </span>
             </div>
             <p className="text-2xl font-display font-black leading-none uppercase">
-              {report.riskLevel} Risk Detected
+              {report.riskLevel === 'high' ? (lang === 'ha' ? 'HADARI MAI GIRMA' : 'HIGH RISK') : report.riskLevel === 'medium' ? (lang === 'ha' ? 'HAdarin Tsaka-Tsaki' : 'MEDIUM RISK') : (lang === 'ha' ? 'HADARI MAI KANKANTA' : 'LOW RISK')}
             </p>
             <p className="text-paper text-sm leading-relaxed">{report.summary}</p>
             {report.recommendation && (
               <div className="pt-2 border-t border-white/5 text-xs font-medium">
-                💡 Recommendation: {report.recommendation}
+                💡 {report.recommendation}
               </div>
             )}
           </div>
 
-          {/* Accordion 1: Text Red Flags */}
+          {/* Expandable Section 1: Red flags list */}
           <div className="card overflow-hidden">
             <button
               onClick={() => setExpandedSection(prev => prev === 'flags' ? '' : 'flags')}
@@ -161,13 +173,13 @@ export function ScamCheckView({ lang = 'en' }) {
                     </div>
                   ))
                 ) : (
-                  <p className="text-teal-light text-sm italic">No specific linguistic scam indicators found.</p>
+                  <p className="text-teal-light text-sm italic">{lang === 'ha' ? 'Babu mabuɗan yaudara da aka gano a rubutun.' : 'No specific linguistic scam indicators found.'}</p>
                 )}
               </div>
             )}
           </div>
 
-          {/* Accordion 2: Link Findings */}
+          {/* Expandable Section 2: Specific link checks */}
           <div className="card overflow-hidden">
             <button
               onClick={() => setExpandedSection(prev => prev === 'links' ? '' : 'links')}
