@@ -1,3 +1,4 @@
+// discontinued
 // api/gemma.js — NO LONGER USED
 // App now calls OpenRouter and Gemini directly from the browser.
 // This file is kept so Vercel doesn't complain about the /api route in vercel.json.
