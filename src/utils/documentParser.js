@@ -1,14 +1,49 @@
 // documentParser.js
-// Strategy: for images → pass directly to Gemma 4 vision (no OCR overhead)
-// For PDFs → extract text with pdf.js, fall back to Gemma 4 vision if scan
+// Strategy: for images → compress to reasonable size AND run client-side Tesseract OCR.
+// This guarantees that even if the vision model cannot load the image or is bypassed,
+// the parsed text details are still sent to the AI for robust prompt execution.
+// For PDFs → extract text with pdf.js, fallback to canvas rendering and OCR if scanned.
+
+/**
+ * Performs client-side OCR on an image source (Blob, File, or DataURL) using Tesseract.js
+ *
+ * @param {File|Blob|string} imageSource
+ * @returns {Promise<string>} Extracted text
+ */
+async function performOCR(imageSource) {
+  try {
+    const { createWorker } = await import('tesseract.js');
+    const worker = await createWorker('eng');
+    const ret = await worker.recognize(imageSource);
+    await worker.terminate();
+    return ret.data.text || '';
+  } catch (err) {
+    console.error('Client-side Tesseract OCR failed:', err);
+    return '';
+  }
+}
 
 export async function extractTextFromFile(file) {
   const type = file.type
 
   if (type.startsWith('image/')) {
-    // Resize & compress image to avoid huge base64 payload fetch errors
+    // 1. Resize & compress image to avoid huge base64 payload fetch errors
     const compressedResult = await resizeAndCompressImage(file)
-    return { mode: 'image', base64: compressedResult.base64, mimeType: compressedResult.mimeType, text: null }
+
+    // 2. Perform client-side OCR as an absolute guarantee/fallback for text analysis
+    let ocrText = ''
+    try {
+      ocrText = await performOCR(file)
+    } catch (err) {
+      console.warn('OCR processing ignored on load error:', err)
+    }
+
+    return {
+      mode: 'image',
+      base64: compressedResult.base64,
+      mimeType: compressedResult.mimeType,
+      text: ocrText || null
+    }
   }
 
   if (type === 'application/pdf') {
@@ -17,12 +52,26 @@ export async function extractTextFromFile(file) {
       if (text && text.trim().length > 50) {
         return { mode: 'text', text, base64: null }
       }
-      // Scanned PDF — render first page as image and pass to Gemma 4 vision
-      const { base64, mimeType } = await pdfToImage(file)
-      return { mode: 'image', base64, mimeType, text: null }
+
+      // Scanned PDF — render first page as image
+      const { base64, mimeType, dataUrl } = await pdfToImage(file)
+      let ocrText = ''
+      try {
+        ocrText = await performOCR(dataUrl)
+      } catch (err) {
+        console.warn('Scanned PDF OCR failed:', err)
+      }
+
+      return { mode: 'image', base64, mimeType, text: ocrText || null }
     } catch {
-      const { base64, mimeType } = await pdfToImage(file)
-      return { mode: 'image', base64, mimeType, text: null }
+      const { base64, mimeType, dataUrl } = await pdfToImage(file)
+      let ocrText = ''
+      try {
+        ocrText = await performOCR(dataUrl)
+      } catch (err) {
+        console.warn('Scanned PDF OCR failed:', err)
+      }
+      return { mode: 'image', base64, mimeType, text: ocrText || null }
     }
   }
 
@@ -35,7 +84,6 @@ export async function extractTextFromFile(file) {
 }
 
 async function extractPDFText(file) {
-  // Dynamic import to avoid bundle bloat
   const pdfjsLib = await import('pdfjs-dist')
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
     'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -77,7 +125,7 @@ async function pdfToImage(file) {
 
   const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
   const base64 = dataUrl.split(',')[1]
-  return { base64, mimeType: 'image/jpeg' }
+  return { base64, mimeType: 'image/jpeg', dataUrl }
 }
 
 export async function fileToBase64(file) {
@@ -103,7 +151,6 @@ export async function resizeAndCompressImage(file, maxWidth = 1024, maxHeight = 
       let width = img.naturalWidth || img.width;
       let height = img.naturalHeight || img.height;
 
-      // Calculate new dimensions keeping aspect ratio
       if (width > maxWidth || height > maxHeight) {
         if (width > height) {
           height = Math.round((height * maxWidth) / width);
