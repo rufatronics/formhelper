@@ -11,6 +11,7 @@ import { useOfflineCache } from '../hooks/useOfflineCache'
 import { VoiceInput } from './VoiceInput'
 import { buildChatPrompt } from '../utils/prompts'
 import { TRANSLATIONS } from '../utils/translations'
+import { extractTextFromFile } from '../utils/documentParser'
 
 const SUGGESTIONS = {
   ha: [
@@ -84,11 +85,12 @@ export function ChatWindow({ lang = 'ha' }) {
   ])
   const [input, setInput] = useState('')
   const [streamingMsg, setStreamingMsg] = useState('')
-  const [attachment, setAttachment] = useState(null) // { base64, mimeType, name }
+  const [attachment, setAttachment] = useState(null) // { base64, mimeType, name, extractedText }
+  const [loadingFile, setLoadingFile] = useState(false)
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
 
-  const { stream, loading, error } = useGeminiAPI()
+  const { stream, loading } = useGeminiAPI()
   const { speak } = useTTS()
   const { saveChatHistory, getChatHistory } = useOfflineCache()
 
@@ -109,22 +111,26 @@ export function ChatWindow({ lang = 'ha' }) {
     fileInputRef.current?.click()
   }
 
-  // Converts attached file to base64 for vision processing
-  const handleFileChange = (e) => {
+  // Converts attached file and extracts OCR details asynchronously
+  const handleFileChange = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      const base64 = reader.result.split(',')[1]
+    setLoadingFile(true)
+    try {
+      const res = await extractTextFromFile(file)
       setAttachment({
-        base64,
-        mimeType: file.type,
+        base64: res.base64,
+        mimeType: res.mimeType || file.type,
         name: file.name,
-        localUrl: URL.createObjectURL(file)
+        localUrl: URL.createObjectURL(file),
+        extractedText: res.text
       })
+    } catch (err) {
+      alert(`Could not read file: ${err.message}`)
+    } finally {
+      setLoadingFile(false)
     }
-    reader.readAsDataURL(file)
   }
 
   const sendMessage = useCallback(async (text) => {
@@ -135,7 +141,7 @@ export function ChatWindow({ lang = 'ha' }) {
     // Create user message representation including attachments
     const userMsg = {
       role: 'user',
-      content: tVal || (lang === 'ha' ? '[An tura hoto]' : '[Uploaded Document Image]'),
+      content: tVal || (lang === 'ha' ? '[An tura hoto / Attached Photo]' : '[Uploaded Document Image]'),
       attachmentUrl: attachment?.localUrl || null,
       id: Date.now()
     }
@@ -150,9 +156,15 @@ export function ChatWindow({ lang = 'ha' }) {
       lang === 'ha' ? 'Hausa' : lang === 'pcm' ? 'Nigerian Pidgin' : 'English'
     }. Keep vocabulary simple, highly clear, and safe for low-literacy users. Use visual markers like emojis where appropriate.`
 
+    // Append extracted OCR text block to userPrompt context so the AI always gets the textual details!
+    let finalUserPrompt = tVal || "Describe and analyze the contents of this uploaded document in detail."
+    if (attachment?.extractedText) {
+      finalUserPrompt = `${finalUserPrompt}\n\n[Attached Document OCR Text content]:\n${attachment.extractedText}`
+    }
+
     const queryParams = {
       systemPrompt,
-      userPrompt: tVal || "Describe and analyze the contents of this uploaded document in detail.",
+      userPrompt: finalUserPrompt,
       history,
       imageBase64: attachment?.base64 || null,
       mimeType: attachment?.mimeType || null,
@@ -223,6 +235,12 @@ export function ChatWindow({ lang = 'ha' }) {
             </div>
           </div>
         )}
+        {loadingFile && (
+          <div className="flex items-center gap-2 text-xs text-white/50 bg-white/5 rounded-xl p-2 max-w-xs animate-pulse">
+            <div className="w-4 h-4 border-2 border-amber border-t-transparent rounded-full animate-spin" />
+            <span>Reading image details...</span>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -247,7 +265,7 @@ export function ChatWindow({ lang = 'ha' }) {
           <img src={attachment.localUrl} alt="Thumbnail attachment" className="w-10 h-10 object-cover rounded-lg" />
           <div className="flex-1 min-w-0">
             <p className="text-xs text-white/70 truncate">{attachment.name}</p>
-            <p className="text-[10px] text-white/30 uppercase">Photo Attached</p>
+            <p className="text-[10px] text-teal uppercase font-semibold">Ready with OCR Text</p>
           </div>
           <button
             onClick={() => setAttachment(null)}
@@ -276,7 +294,7 @@ export function ChatWindow({ lang = 'ha' }) {
           className="bg-white/10 hover:bg-white/20 border border-white/20 text-paper px-3 rounded-xl flex items-center justify-center transition-colors focus:outline-none"
           title="Attach document image"
           aria-label="Attach document image"
-          disabled={loading}
+          disabled={loading || loadingFile}
         >
           📷
         </button>
@@ -288,12 +306,12 @@ export function ChatWindow({ lang = 'ha' }) {
           placeholder={t.chatPlaceholder}
           className="input-field flex-1"
           aria-label="Type your question"
-          disabled={loading}
+          disabled={loading || loadingFile}
         />
-        <VoiceInput onResult={text => { setInput(text); sendMessage(text) }} disabled={loading} />
+        <VoiceInput onResult={text => { setInput(text); sendMessage(text) }} disabled={loading || loadingFile} />
         <button
           onClick={() => sendMessage(input)}
-          disabled={(!input.trim() && !attachment) || loading}
+          disabled={(!input.trim() && !attachment) || loading || loadingFile}
           className="btn-primary px-4 py-3 text-sm"
           aria-label="Send message"
         >
